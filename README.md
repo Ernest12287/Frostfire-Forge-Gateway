@@ -1,6 +1,6 @@
 # Frostfire Forge Gateway
 
-Authentication and load balancing gateway for Frostfire Forge game servers.
+Authentication and reverse proxy gateway for Frostfire Forge game servers.
 
 ## Features
 
