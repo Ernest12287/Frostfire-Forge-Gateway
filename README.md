@@ -4,11 +4,10 @@ Authentication and load balancing gateway for Frostfire Forge game servers.
 
 ## Features
 
-- WebSocket game server authentication and registration
+- Game server authentication and registration
 - HTTP webserver for user authentication (login, registration, password reset)
-- Load balancing with sticky sessions
 - Real-time server health monitoring dashboard
-- Automatic server failover and session migration
+- Automatic server failover and websocket session migration
 - SSL/TLS support for production deployments
 
 ## Quick Start
@@ -54,6 +53,7 @@ GATEWAY_PORT=9999
 GATEWAY_PORTSSL=9443
 GATEWAY_USESSL=false
 GATEWAY_AUTH_KEY="your-gateway-auth-key-uuid-here"
+GATEWAY_GAME_SERVER_SECRET="your-secure-shared-secret-here"
 HEARTBEAT_INTERVAL=30000
 SERVER_TIMEOUT=90000
 SESSION_TIMEOUT=1800000

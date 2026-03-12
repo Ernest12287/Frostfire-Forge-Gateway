@@ -52,7 +52,6 @@ import {
   updateAdminMapInput,
   updateAdminPlayerListWithData,
 } from "./ui.ts";
-import { playAudio, playMusic } from "./audio.ts";
 import { updateXp } from "./xp.ts";
 import { createNPC } from "./npc.ts";
 import parseAPNG from "../libs/apng_parser.js";
