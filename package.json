@@ -5,7 +5,13 @@
   "module": "src/start.ts",
   "scripts": {
     "production": "bun --env-file=.env.production src/start.ts",
-    "development": "bun --env-file=.env.development src/start.ts"
+    "development": "bun --env-file=.env.development src/start.ts",
+    "docker:dev:up": "docker-compose -f src/docker/docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker-compose -f src/docker/docker-compose.dev.yml down",
+    "docker:dev:logs": "docker-compose -f src/docker/docker-compose.dev.yml logs -f",
+    "docker:prod:up": "docker-compose -f src/docker/docker-compose.prod.yml up -d",
+    "docker:prod:down": "docker-compose -f src/docker/docker-compose.prod.yml down",
+    "docker:prod:logs": "docker-compose -f src/docker/docker-compose.prod.yml logs -f"
   },
   "keywords": [
     "gateway",
