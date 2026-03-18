@@ -113,15 +113,17 @@ jobs:
           tags: |
             type=raw,value=latest
 
-      - name: Determine Dockerfile
+      - name: Determine Dockerfile and Image Tag
         id: dockerfile
         run: |
           if [ "${{ github.ref }}" = "refs/heads/development" ]; then
             echo "dockerfile=./src/docker/Dockerfile.dev" >> $GITHUB_OUTPUT
             echo "target=development" >> $GITHUB_OUTPUT
+            echo "image_tag=frostfire-forge-gateway_development" >> $GITHUB_OUTPUT
           else
             echo "dockerfile=./src/docker/Dockerfile.prod" >> $GITHUB_OUTPUT
             echo "target=production" >> $GITHUB_OUTPUT
+            echo "image_tag=frostfire-forge-gateway" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Docker Image
@@ -132,7 +134,7 @@ jobs:
           target: ${{ steps.dockerfile.outputs.target }}
           push: false
           load: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/${{ github.repository }}/${{ steps.dockerfile.outputs.image_tag }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -142,7 +144,7 @@ jobs:
 
       - name: Start and Test Docker Container
         run: |
-          docker run -d --name gateway-test --env-file=.env.development -p 9999:9999 -p 80:80 ghcr.io/${{ github.repository }}:latest
+          docker run -d --name gateway-test --env-file=.env.development -p 9999:9999 -p 80:80 ghcr.io/${{ github.repository }}/${{ steps.dockerfile.outputs.image_tag }}:latest
           sleep 5
           if ! docker ps | grep -q gateway-test; then
             echo "Container failed to start!"
@@ -164,7 +166,9 @@ jobs:
           file: ${{ steps.dockerfile.outputs.dockerfile }}
           target: ${{ steps.dockerfile.outputs.target }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ steps.dockerfile.outputs.image_tag }}:latest
+            ghcr.io/${{ github.repository }}/${{ steps.dockerfile.outputs.image_tag }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
