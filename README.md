@@ -1,6 +1,19 @@
-# Frostfire Forge Gateway
+<p align="center">
+  <img src="../../blob/main/logo.png?raw=true">
+</p>
 
+<h1 align="center">🧊🔥 Frostfire Forge Gateway🔥🧊</h1>
+
+<p align="center">
+  <strong>A Modern Reverse Proxy</strong>
+</p>
+
+<p align="center">
 A production-grade authentication and reverse proxy gateway for Frostfire Forge game servers. Provides centralized user authentication, game server registration, automatic failover, real-time health monitoring, and realm-based server routing.
+</p>
+<p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/Lillious-Networks/Frostfire-Forge-Gateway/release.yml?branch=main&label=Docker&style=flat-square" alt="Docker">
+</p>
 
 ## Features
 
