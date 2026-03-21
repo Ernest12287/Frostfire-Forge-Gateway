@@ -4,7 +4,7 @@ const cache = Cache.getInstance();
 import { getCameraX, getCameraY } from "./renderer.js";
 import { chatInput, pauseMenu, optionsMenu, fpsSlider, musicSlider, effectsSlider, mutedCheckbox, canvas, ctx, friendsList } from "./ui.js";
 import { getUserHasInteracted, setUserHasInteracted, setControllerConnected, getLastSentDirection, setLastSentDirection,
-    getLastTypingPacket, setLastTypingPacket, getContextMenuKeyTriggered, setContextMenuKeyTriggered, blacklistedKeys, movementKeys, 
+    getLastTypingPacket, setLastTypingPacket, getContextMenuKeyTriggered, setContextMenuKeyTriggered, blacklistedKeys, movementKeys,
     pressedKeys,
     setIsKeyPressed,
     getIsKeyPressed,
@@ -19,8 +19,6 @@ import { friendsListSearch } from "./friends.js";
 import { createContextMenu, createPartyContextMenu } from "./actions.js";
 let typingTimer: number | null = null;
 
-// Fix iOS Safari 100vh bug immediately on page load
-// Use visualViewport if available (more accurate on mobile), fallback to innerHeight
 const getActualViewportHeight = () => {
   if (window.visualViewport) {
     return window.visualViewport.height;
@@ -53,11 +51,9 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
   if (!getIsLoaded()) return;
   if (pauseMenu.style.display == "block") return;
 
-  // Get the joystick coordinates
   const x = e.detail.x;
   const y = e.detail.y;
 
-  // Check if joystick is in neutral position (increased deadzone)
   const deadzone = 0.5;
   if (Math.abs(x) < deadzone && Math.abs(y) < deadzone) {
     if (getLastSentDirection() !== "ABORT") {
@@ -70,10 +66,8 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
     return;
   }
 
-  // Determine the angle in degrees
   const angle = Math.atan2(y, x) * (180 / Math.PI);
 
-  // Determine direction based on angle ranges
   let direction = "";
   if (angle >= -22.5 && angle < 22.5) {
     direction = "RIGHT";
@@ -93,7 +87,6 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
     direction = "UPRIGHT";
   }
 
-  // Only send if direction changed
   if (direction && direction !== getLastSentDirection()) {
     if (pauseMenu.style.display == "block") return;
     sendRequest({
@@ -105,12 +98,11 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
 });
 
 chatInput.addEventListener("input", () => {
-  // Clear any existing timer
+
   if (typingTimer) {
     window.clearTimeout(typingTimer);
   }
 
-  // Send typing packet if enough time has passed since last one
   if (getLastTypingPacket() + 1000 < performance.now()) {
     sendRequest({
       type: "TYPING",
@@ -119,7 +111,6 @@ chatInput.addEventListener("input", () => {
     setLastTypingPacket(performance.now());
   }
 
-  // Set new timer to send another packet after delay
   typingTimer = window.setTimeout(() => {
     if (chatInput.value.length > 0) {
       sendRequest({
@@ -135,26 +126,25 @@ window.addEventListener("keydown", async (e) => {
   if (e.key === 'ContextMenu' || e.code === 'ContextMenu') {
     setContextMenuKeyTriggered(true);
   }
-  // Prevent blacklisted keys
+
   if (blacklistedKeys.has(e.code)) {
-    // Check for tab
+
     if (e.code === "Tab" && !getContextMenuKeyTriggered()) {
       const target = Array.from(cache.players).find(player => player.targeted);
       if (target) {
         target.targeted = false;
       }
-      //displayElement(targetStats, false);
+
       sendRequest({ type: "TARGETCLOSEST", data: null });
       e.preventDefault();
       return;
     }
-    
+
     e.preventDefault();
     return;
   }
   if (!getIsLoaded() || (pauseMenu.style.display === "block" && e.code !== "Escape")) return;
 
-  // Prevent movement when typing in any input field
   const activeElement = document.activeElement;
   const isTypingInInput = activeElement && (
     activeElement.tagName === 'INPUT' ||
@@ -163,7 +153,6 @@ window.addEventListener("keydown", async (e) => {
   );
   if (isTypingInInput && !["Enter", "Escape"].includes(e.code)) return;
 
-  // Handle movement keys
   if (movementKeys.has(e.code)) {
     pressedKeys.add(e.code);
     if (!getIsKeyPressed()) {
@@ -174,11 +163,10 @@ window.addEventListener("keydown", async (e) => {
     }
   }
 
-  // Handle other mapped keys
   const now = Date.now();
   const handler = keyHandlers[e.code as keyof typeof keyHandlers];
   if (!handler) return;
-  // Prevent repeated calls within cooldown
+
   if (cooldowns[e.code] && now - cooldowns[e.code] < COOLDOWN_DURATION) return;
 
   cooldowns[e.code] = now;
@@ -191,7 +179,7 @@ window.addEventListener("keydown", async (e) => {
 });
 
 window.addEventListener("keyup", (e) => {
-  // Prevent movement keys from being cleared when typing in any input field
+
   const activeElement = document.activeElement;
   const isTypingInInput = activeElement && (
     activeElement.tagName === 'INPUT' ||
@@ -208,17 +196,14 @@ window.addEventListener("keyup", (e) => {
   }
 });
 
-// Detect if device is iOS
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 const isIPhone = /iPhone/.test(navigator.userAgent);
 const isIPad = /iPad/.test(navigator.userAgent);
 
-// Detect orientation and apply appropriate scaling class
 function updateOrientationClass() {
   const isLandscape = window.innerWidth > window.innerHeight;
   const viewportHeight = window.innerHeight;
 
-  // Remove all existing classes
   document.body.classList.remove('portrait-mode', 'landscape-mode', 'ios-device', 'iphone-device', 'ipad-device', 'mobile-landscape', 'small-landscape', 'tiny-landscape');
 
   if (isIOS) {
@@ -236,15 +221,12 @@ function updateOrientationClass() {
   if (isLandscape) {
     document.body.classList.add('landscape-mode');
 
-    // Add more specific landscape classes based on actual viewport dimensions
     if (viewportHeight <= 600) {
       document.body.classList.add('mobile-landscape');
 
-      // Very small landscape (phones)
       if (viewportHeight <= 450) {
         document.body.classList.add('small-landscape');
 
-        // Ultra small landscape (edge browser on iPhone, etc)
         if (viewportHeight <= 380) {
           document.body.classList.add('tiny-landscape');
         }
@@ -256,31 +238,26 @@ function updateOrientationClass() {
 }
 
 window.addEventListener("resize", () => {
-  // Fix iOS Safari 100vh bug by setting actual viewport height
+
   const actualHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   document.documentElement.style.setProperty('--viewport-height', `${actualHeight}px`);
 
-  // Update canvas size to match new window size with device pixel ratio support
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;
   canvas.height = actualHeight * dpr;
 
-  // Use actual viewport pixel dimensions instead of vw/vh to avoid iOS Safari bugs
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = actualHeight + "px";
 
-  // Re-scale context to match device pixel ratio after resize
   if (ctx) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // Check if device is touch-capable (mobile)
     const isTouchDevice = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
-    // Apply zoom out on mobile devices for better visibility
     if (isTouchDevice) {
-      const mobileZoom = 0.85; // 85% zoom = show more of the world
+      const mobileZoom = 0.85;
       ctx.scale(dpr * mobileZoom, dpr * mobileZoom);
-      // Translate to center the zoomed out view
+
       ctx.translate((window.innerWidth * (1 - mobileZoom)) / (2 * mobileZoom),
                     (actualHeight * (1 - mobileZoom)) / (2 * mobileZoom));
     } else {
@@ -289,27 +266,21 @@ window.addEventListener("resize", () => {
 
   }
 
-  // Remove any open context menu on resize
   if (document.getElementById("context-menu")) {
     document.getElementById("context-menu")!.remove();
   }
 
-  // Update orientation classes for responsive UI
   updateOrientationClass();
 
-  // Note: Camera position is maintained in world coordinates, which are independent
-  // of viewport size. The renderer will automatically recalculate offsets on next frame.
 });
 
-// Listen for orientation changes on mobile devices
 window.addEventListener("orientationchange", () => {
-  // Small delay to ensure dimensions are updated
+
   setTimeout(() => {
     updateOrientationClass();
   }, 100);
 });
 
-// Initialize orientation class on load
 updateOrientationClass();
 
 window.addEventListener("blur", () => {
@@ -326,7 +297,7 @@ document
 document
   .getElementById("pause-menu-action-options")
   ?.addEventListener("click", () => {
-    // If any other menu is open, close all other menus
+
     pauseMenu.style.display = "none";
     optionsMenu.style.display = "block";
   });
@@ -373,19 +344,18 @@ effectsSlider.addEventListener("input", () => {
   });
 });
 
-// Capture click and get coordinates from canvas
 document.addEventListener("contextmenu", (event) => {
   if (!getIsLoaded()) return;
-  // Don't process if tile editor is active
+
   if ((window as any).tileEditor?.isActive) return;
   if (getContextMenuKeyTriggered()) {
     event.preventDefault();
     setContextMenuKeyTriggered(false);
     return;
   }
-  // Handle right-click on the UI
+
   if ((event.target as HTMLElement)?.classList.contains("ui")) {
-    // Check if we clicked on a party member
+
     const partyMember = (event.target as HTMLElement).closest(".party-member") as HTMLElement;
     if (partyMember) {
       const username = partyMember.dataset.username;
@@ -397,16 +367,14 @@ document.addEventListener("contextmenu", (event) => {
     }
     return;
   }
-  // Check where we clicked on the canvas
+
   const rect = canvas.getBoundingClientRect();
   const screenX = event.clientX - rect.left;
   const screenY = event.clientY - rect.top;
 
-  // Convert screen coordinates to world coordinates
   const worldX = screenX - window.innerWidth / 2 + getCameraX();
   const worldY = screenY - window.innerHeight / 2 + getCameraY();
 
-  // Did we click on a player?
   const clickedPlayer = Array.from(cache.players).find(player => {
     const playerX = player.position.x;
     const playerY = player.position.y;
@@ -418,12 +386,11 @@ document.addEventListener("contextmenu", (event) => {
 
   if (clickedPlayer) {
     const id = clickedPlayer.id;
-    // Create context menu for the clicked player
+
     createContextMenu(event, id);
-    return; // Stop further processing
+    return;
   }
 
-  // Remove any existing context menu
   const existingMenu = document.getElementById("context-menu");
   if (existingMenu) existingMenu.remove();
 
@@ -434,12 +401,12 @@ document.addEventListener("contextmenu", (event) => {
 });
 
 document.addEventListener("click", (event) => {
-  // Check if we clicked on a player
+
   if (!getIsLoaded()) return;
-  // Don't process if tile editor is active
+
   if ((window as any).tileEditor?.isActive) return;
   if ((event.target as HTMLElement)?.classList.contains("ui")) return;
-  // If we don't click on the context menu, remove it
+
   const contextMenu = document.getElementById("context-menu");
   if (contextMenu && !contextMenu.contains(event.target as Node)) {
     contextMenu.remove();
@@ -449,11 +416,9 @@ document.addEventListener("click", (event) => {
   const screenX = event.clientX - rect.left;
   const screenY = event.clientY - rect.top;
 
-  // Convert screen coordinates to world coordinates
   const worldX = screenX - window.innerWidth / 2 + getCameraX();
   const worldY = screenY - window.innerHeight / 2 + getCameraY();
 
-  // Untarget any currently targeted player
   const target = Array.from(cache.players).find(player => player.targeted);
   if (target) {
     target.targeted = false;
@@ -473,7 +438,6 @@ friendsListSearch.addEventListener("focus", () => {
   stopMovement();
 });
 
-// Stop movement when focusing on admin panel input fields
 const adminInputFields = [
   document.getElementById("admin-map-input"),
   document.getElementById("admin-warp-input"),
@@ -502,9 +466,9 @@ friendsListSearch.addEventListener("input", () => {
   const searchTerm = friendsListSearch.value.toLowerCase();
   const friendItems = Array.from(friendsList.querySelectorAll('.friend-item')) as HTMLElement[];
   if (!searchTerm) {
-    // If search term is empty, show all items
+
     friendItems.forEach(item => {
-      item.style.display = 'block'; // Reset display to default
+      item.style.display = 'block';
     });
     return;
   }
@@ -512,9 +476,9 @@ friendsListSearch.addEventListener("input", () => {
   friendItems.forEach(item => {
     const friendName = item.querySelector('.friend-name')?.textContent?.toLowerCase() || '';
     if (friendName.includes(searchTerm)) {
-      item.style.display = 'block'; // Show matching items
+      item.style.display = 'block';
     } else {
-      item.style.display = 'none'; // Hide non-matching items
+      item.style.display = 'none';
     }
   });
 });

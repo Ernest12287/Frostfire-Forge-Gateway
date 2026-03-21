@@ -1,4 +1,4 @@
-// Load configuration from environment variables
+
 const useSSL = process.env.GATEWAY_USESSL === "true" || process.env.GATEWAY_USESSL === "1";
 const httpPort = parseInt(process.env.GATEWAY_PORT || "9999");
 const httpsPort = parseInt(process.env.GATEWAY_PORTSSL || "9443");
@@ -12,13 +12,10 @@ const config: GatewayConfig = {
   authKey: process.env.GATEWAY_AUTH_KEY || "change-this-secret-key"
 };
 
-// Store registered game servers
 const gameServers: Map<string, GameServer> = new Map();
 
-// Sticky session tracking: clientId → ClientSession
 const clientSessions: Map<string, ClientSession> = new Map();
 
-// Migration statistics
 let totalMigrations = 0;
 const migrationHistory: Array<{
   timestamp: number;
@@ -27,17 +24,12 @@ const migrationHistory: Array<{
   clientCount: number;
 }> = [];
 
-// Dashboard authentication sessions: sessionToken → expiryTime
 const dashboardSessions: Map<string, number> = new Map();
-const DASHBOARD_SESSION_TIMEOUT = 3600000; // 1 hour
+const DASHBOARD_SESSION_TIMEOUT = 3600000;
 
-/**
- * Migrate sessions from a dead server to healthy servers
- */
 function migrateSessionsFromDeadServer(deadServerId: string): number {
   const sessionsToMigrate: string[] = [];
 
-  // Find all sessions pointing to the dead server
   for (const [clientId, session] of clientSessions.entries()) {
     if (session.serverId === deadServerId) {
       sessionsToMigrate.push(clientId);
@@ -48,14 +40,13 @@ function migrateSessionsFromDeadServer(deadServerId: string): number {
     return 0;
   }
 
-  // Get available healthy servers
   const healthyServers = Array.from(gameServers.values()).filter(
     server => server.activeConnections < server.maxConnections
   );
 
   if (healthyServers.length === 0) {
     console.warn(`[Gateway] No healthy servers available for migration from ${deadServerId}`);
-    // Delete sessions if no healthy servers available
+
     for (const clientId of sessionsToMigrate) {
       clientSessions.delete(clientId);
     }
@@ -67,24 +58,20 @@ function migrateSessionsFromDeadServer(deadServerId: string): number {
   let migrationIndex = 0;
   let migratedCount = 0;
 
-  // Migrate sessions to healthy servers (round-robin distribution)
   for (const clientId of sessionsToMigrate) {
     const session = clientSessions.get(clientId);
     if (!session) continue;
 
-    // Select next healthy server in round-robin fashion
     const targetServer = healthyServers[migrationIndex % healthyServers.length];
     migrationIndex++;
 
-    // Update session to point to new server
     session.serverId = targetServer.id;
-    session.lastActivity = Date.now(); // Reset activity to prevent immediate expiration
+    session.lastActivity = Date.now();
 
     migratedCount++;
     console.log(`[Gateway] Migrated client ${clientId}: ${deadServerId} → ${targetServer.id}`);
   }
 
-  // Record migration in history
   if (migratedCount > 0) {
     healthyServers[0].id;
     migrationHistory.push({
@@ -94,7 +81,6 @@ function migrateSessionsFromDeadServer(deadServerId: string): number {
       clientCount: migratedCount
     });
 
-    // Keep only last 100 migrations in history
     if (migrationHistory.length > 100) {
       migrationHistory.shift();
     }
@@ -105,16 +91,12 @@ function migrateSessionsFromDeadServer(deadServerId: string): number {
   return migratedCount;
 }
 
-/**
- * Remove dead servers that haven't sent heartbeat and migrate their sessions
- */
 function cleanupDeadServers() {
   const now = Date.now();
   for (const [id, server] of gameServers.entries()) {
     if (now - server.lastHeartbeat > config.serverTimeout) {
       console.log(`[Gateway] Server died: ${id} (${server.host}:${server.port})`);
 
-      // Migrate sessions before removing server
       const migratedCount = migrateSessionsFromDeadServer(id);
 
       if (migratedCount > 0) {
@@ -123,15 +105,11 @@ function cleanupDeadServers() {
         console.log(`[Gateway] No sessions to migrate from ${id}`);
       }
 
-      // Remove the dead server
       gameServers.delete(id);
     }
   }
 }
 
-/**
- * Remove expired client sessions
- */
 function cleanupExpiredSessions() {
   const now = Date.now();
   let removedCount = 0;
@@ -148,27 +126,21 @@ function cleanupExpiredSessions() {
   }
 }
 
-// Start cleanup intervals
 setInterval(cleanupDeadServers, config.heartbeatInterval);
-setInterval(cleanupExpiredSessions, 60000); // Clean up sessions every minute
+setInterval(cleanupExpiredSessions, 60000);
 
-/**
- * HTTP Server for game server registration
- */
 const serverConfig: any = {
   port: config.port,
   hostname: "0.0.0.0",
   async fetch(req: any) {
     const url = new URL(req.url);
 
-    // CORS headers for all responses
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // Handle CORS preflight requests
     if (req.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -176,13 +148,11 @@ const serverConfig: any = {
       });
     }
 
-    // Server registration endpoint
     if (url.pathname === "/register" && req.method === "POST") {
       try {
         const body = await req.json();
         const { id, host, publicHost, port, wsPort, useSSL, maxConnections, authKey } = body;
 
-        // Validate authentication key
         if (authKey !== config.authKey) {
           console.warn(`[Gateway] Registration attempt with invalid auth key from ${host}`);
           return new Response(JSON.stringify({ error: "Invalid authentication key" }), {
@@ -198,19 +168,18 @@ const serverConfig: any = {
           });
         }
 
-        // Check if server already exists (re-registration)
         const existingServer = gameServers.get(id);
         const isReRegistration = !!existingServer;
 
         const server: GameServer = {
           id,
           host,
-          publicHost: publicHost || host,  // Use publicHost if provided, fallback to host
+          publicHost: publicHost || host,
           port,
           wsPort,
-          useSSL: useSSL === true, // Explicitly check for true, default to false
+          useSSL: useSSL === true,
           lastHeartbeat: Date.now(),
-          activeConnections: existingServer?.activeConnections || 0, // Preserve connection count
+          activeConnections: existingServer?.activeConnections || 0,
           maxConnections: maxConnections || 1000
         };
 
@@ -233,13 +202,11 @@ const serverConfig: any = {
       }
     }
 
-    // Server heartbeat endpoint
     if (url.pathname === "/heartbeat" && req.method === "POST") {
       try {
         const body = await req.json();
         const { id, activeConnections, cpuUsage, ramUsage, authKey, rtt } = body;
 
-        // Validate authentication key
         if (authKey !== config.authKey) {
           return new Response(JSON.stringify({ error: "Invalid authentication key" }), {
             status: 401,
@@ -252,18 +219,16 @@ const serverConfig: any = {
           server.lastHeartbeat = Date.now();
           server.activeConnections = activeConnections || 0;
 
-          // Update metrics if provided
           if (cpuUsage !== undefined) server.cpuUsage = cpuUsage;
           if (ramUsage !== undefined) server.ramUsage = ramUsage;
 
-          // Use RTT provided by client (more accurate, clock-independent)
           if (rtt !== undefined) {
-            server.latency = Math.round(rtt / 2); // Half of round-trip time
+            server.latency = Math.round(rtt / 2);
           }
 
           return new Response(JSON.stringify({
             success: true,
-            timestamp: Date.now() // Send back timestamp for RTT calculation
+            timestamp: Date.now()
           }), {
             headers: { "Content-Type": "application/json" }
           });
@@ -281,13 +246,11 @@ const serverConfig: any = {
       }
     }
 
-    // Server unregister endpoint
     if (url.pathname === "/unregister" && req.method === "POST") {
       try {
         const body = await req.json();
         const { id, authKey } = body;
 
-        // Validate authentication key
         if (authKey !== config.authKey) {
           return new Response(JSON.stringify({ error: "Invalid authentication key" }), {
             status: 401,
@@ -314,12 +277,10 @@ const serverConfig: any = {
       }
     }
 
-    // Map checksum sync endpoint
     if (url.pathname === "/map-checksums" && req.method === "POST") {
       try {
         const { checksums, serverId, authKey } = await req.json();
 
-        // Validate authentication key
         if (authKey !== config.authKey) {
           return new Response(JSON.stringify({ error: "Invalid authentication key" }), {
             status: 401,
@@ -327,13 +288,10 @@ const serverConfig: any = {
           });
         }
 
-        // Import checksum utilities
         const { calculateAllMapChecksums, getMapContent } = await import("../modules/checksums");
 
-        // Get current master checksums
         const masterChecksums = calculateAllMapChecksums();
 
-        // Compare and find outdated maps
         const outdatedMaps: any[] = [];
         for (const [mapName, masterChecksum] of Object.entries(masterChecksums)) {
           const clientChecksum = checksums[mapName];
@@ -366,12 +324,10 @@ const serverConfig: any = {
       }
     }
 
-    // Map update endpoint (server sends updated map)
     if (url.pathname === "/update-map" && req.method === "POST") {
       try {
         const { mapName, mapData, serverId, authKey } = await req.json();
 
-        // Validate authentication key
         if (authKey !== config.authKey) {
           return new Response(JSON.stringify({ error: "Invalid authentication key" }), {
             status: 401,
@@ -379,10 +335,8 @@ const serverConfig: any = {
           });
         }
 
-        // Import checksum utilities
         const { writeMapContent, calculateAllMapChecksums } = await import("../modules/checksums");
 
-        // Write updated map to master
         const success = writeMapContent(mapName, mapData);
 
         if (!success) {
@@ -392,14 +346,11 @@ const serverConfig: any = {
           });
         }
 
-        // Calculate new checksums (all maps)
         const checksums = calculateAllMapChecksums();
         const newChecksum = checksums[mapName] || "";
 
         console.log(`[Gateway] Map updated: ${mapName} by server ${serverId}`);
 
-        // TODO: Broadcast to all other connected game servers via WebSocket
-        // For now, just confirm the update
         return new Response(JSON.stringify({
           success: true,
           checksum: newChecksum,
@@ -416,14 +367,13 @@ const serverConfig: any = {
       }
     }
 
-    // Dashboard login endpoint
     if (url.pathname === "/api/login" && req.method === "POST") {
       try {
         const body = await req.json();
         const { authKey } = body;
 
         if (authKey === config.authKey) {
-          // Generate session token
+
           const sessionToken = crypto.randomUUID();
           dashboardSessions.set(sessionToken, Date.now() + DASHBOARD_SESSION_TIMEOUT);
 
@@ -447,7 +397,6 @@ const serverConfig: any = {
       }
     }
 
-    // Dashboard logout endpoint
     if (url.pathname === "/api/logout" && req.method === "POST") {
       const cookies = req.headers.get('cookie') || '';
       const sessionMatch = cookies.match(/dashboard_session=([^;]+)/);
@@ -463,7 +412,6 @@ const serverConfig: any = {
       });
     }
 
-    // Dashboard stats endpoint (requires authentication)
     if (url.pathname === "/api/stats" && req.method === "GET") {
       const cookies = req.headers.get('cookie') || '';
       const sessionMatch = cookies.match(/dashboard_session=([^;]+)/);
@@ -486,7 +434,6 @@ const serverConfig: any = {
         });
       }
 
-      // Extend session
       dashboardSessions.set(sessionToken, Date.now() + DASHBOARD_SESSION_TIMEOUT);
 
       const servers = Array.from(gameServers.values()).map(s => ({
@@ -516,13 +463,12 @@ const serverConfig: any = {
       });
     }
 
-    // Dashboard page (requires authentication)
     if (url.pathname === "/dashboard" && req.method === "GET") {
       const cookies = req.headers.get('cookie') || '';
       const sessionMatch = cookies.match(/dashboard_session=([^;]+)/);
 
       if (!sessionMatch) {
-        // Redirect to login
+
         return Response.redirect("/", 302);
       }
 
@@ -534,14 +480,12 @@ const serverConfig: any = {
         return Response.redirect("/", 302);
       }
 
-      // Serve dashboard HTML
       const dashboardHTML = await Bun.file(new URL("../webserver/public/dashboard.html", import.meta.url)).text();
       return new Response(dashboardHTML, {
         headers: { "Content-Type": "text/html" }
       });
     }
 
-    // Login page
     if (url.pathname === "/" && req.method === "GET") {
       const loginHTML = await Bun.file(new URL("../webserver/public/login.html", import.meta.url)).text();
       return new Response(loginHTML, {
@@ -549,7 +493,6 @@ const serverConfig: any = {
       });
     }
 
-    // Status endpoint (public - only player-relevant info)
     if (url.pathname === "/status" && req.method === "GET") {
       const servers = Array.from(gameServers.values()).map(s => {
         const isHealthy = (Date.now() - s.lastHeartbeat) < config.serverTimeout;
@@ -579,7 +522,6 @@ const serverConfig: any = {
       });
     }
 
-    // Debug endpoint to view sessions
     if (url.pathname === "/debug/sessions" && req.method === "GET") {
       const sessions = Array.from(clientSessions.entries()).map(([clientId, session]) => ({
         clientId,
@@ -599,8 +541,6 @@ const serverConfig: any = {
       });
     }
 
-    // Proxy ALL HTTP requests to game servers except gateway-specific routes
-    // Gateway-specific routes that should NOT be proxied
     const gatewayRoutes = ['/register', '/heartbeat', '/unregister', '/status', '/debug', '/api', '/dashboard'];
     const webRoutes = ['/','/login','/logout'];
     const isGatewayRoute = gatewayRoutes.some(route => url.pathname.startsWith(route)) || url.pathname === '/';
@@ -612,7 +552,6 @@ const serverConfig: any = {
         return new Response("No game servers available", { status: 503 });
       }
 
-      // Use sticky HTTP sessions based on cookie
       const cookies = req.headers.get('cookie') || '';
       const httpSessionMatch = cookies.match(/gateway_http_session=([^;]+)/);
       let targetServer: GameServer | null = null;
@@ -621,18 +560,16 @@ const serverConfig: any = {
 
       if (httpSessionMatch) {
         httpSessionId = httpSessionMatch[1] as string;
-        // Try to get the server for this HTTP session
+
         const session = clientSessions.get(httpSessionId);
         if (session) {
           targetServer = gameServers.get(session.serverId) || null;
         }
       }
 
-      // If no sticky session, pick a random server and create session
       if (!targetServer) {
         targetServer = availableServers[Math.floor(Math.random() * availableServers.length)];
 
-        // Create a session ID for HTTP requests
         httpSessionId = `http-${crypto.randomUUID()}`;
         clientSessions.set(httpSessionId, {
           serverId: targetServer.id,
@@ -646,17 +583,15 @@ const serverConfig: any = {
       const targetUrl = `http://${targetServer.host}:${targetServer.port}${url.pathname}${url.search}`;
 
       try {
-        // Proxy the request to the game server
+
         const proxyResponse = await fetch(targetUrl, {
           method: req.method,
           headers: req.headers,
           body: req.body
         });
 
-        // Clone response headers and add sticky session cookie
         const responseHeaders = new Headers(proxyResponse.headers);
 
-        // Set sticky session cookie if this is a new session
         if (isNewSession && httpSessionId) {
           responseHeaders.set('Set-Cookie', `gateway_http_session=${httpSessionId}; Path=/; Max-Age=3600; SameSite=Lax; HttpOnly`);
         }
@@ -674,14 +609,13 @@ const serverConfig: any = {
   }
 };
 
-// Add SSL/TLS configuration if enabled
 if (useSSL) {
   const certPath = process.env.GATEWAY_CERT_PATH || "./src/certs/gateway/cert.pem";
   const keyPath = process.env.GATEWAY_KEY_PATH || "./src/certs/gateway/key.pem";
   const caPath = process.env.GATEWAY_CA_PATH || "./src/certs/gateway/cert.ca-bundle";
 
   try {
-    // Read certificate and CA bundle, concatenate them for full chain
+
     const cert = await Bun.file(certPath).text();
     const ca = await Bun.file(caPath).text();
     const fullChain = cert + "\n" + ca;
@@ -704,7 +638,6 @@ const protocol = useSSL ? 'https' : 'http';
 console.log(`[Gateway] Gateway Server running on ${protocol}://localhost:${config.port}`);
 console.log(`[Gateway] Waiting for game servers to register...`);
 
-// If HTTPS is enabled, also start an HTTP server that handles localhost health checks and redirects external traffic to HTTPS
 if (useSSL) {
   const httpPort = parseInt(process.env.GATEWAY_PORT || "9999");
   Bun.serve({
@@ -713,11 +646,10 @@ if (useSSL) {
     fetch(req: Request) {
       const url = new URL(req.url);
 
-      // Handle health check endpoints directly for localhost to avoid certificate issues
       const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
 
       if (isLocalhost && url.pathname === '/status' && req.method === 'GET') {
-        // Serve status directly for localhost requests
+
         const servers = Array.from(gameServers.values()).map(s => {
           const isHealthy = (Date.now() - s.lastHeartbeat) < config.serverTimeout;
           const isFull = s.activeConnections >= s.maxConnections;
@@ -743,7 +675,6 @@ if (useSSL) {
         });
       }
 
-      // Redirect all other requests to HTTPS
       const sslPort = config.port === 443 ? "" : `:${config.port}`;
       const httpsUrl = `https://${url.hostname}${sslPort}${url.pathname}${url.search}`;
       console.log(`[Gateway] Redirecting HTTP request to: ${httpsUrl}`);

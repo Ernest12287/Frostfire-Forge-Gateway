@@ -1,13 +1,11 @@
 import { inventoryUI, spellBookUI, friendsListUI, guildContainer, collectablesUI } from "./ui.js";
 
-// Track toggle states
 let toggleInventory = false;
 let toggleSpellBook = false;
 let toggleFriendsList = false;
 let toggleGuild = false;
 let toggleCollectables = false;
 
-// Get button elements
 const mobileInventoryBtn = document.getElementById('mobile-inventory-button');
 const mobileSpellbookBtn = document.getElementById('mobile-spellbook-button');
 const mobileCollectablesBtn = document.getElementById('mobile-collectables-button');
@@ -15,10 +13,8 @@ const mobileFriendsBtn = document.getElementById('mobile-friends-button');
 const mobileGuildBtn = document.getElementById('mobile-guild-button');
 const mobileBackdrop = document.getElementById('mobile-ui-backdrop');
 
-// Check if we're on a touch device
 const isTouchDevice = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
-// Helper to update backdrop visibility
 function updateOverlay() {
   const anyOpen = toggleInventory || toggleSpellBook || toggleFriendsList || toggleGuild || toggleCollectables;
   if (isTouchDevice && mobileBackdrop) {
@@ -30,7 +26,6 @@ function updateOverlay() {
   }
 }
 
-// Helper to toggle panel with class
 function togglePanel(panel: HTMLElement, isOpen: boolean): boolean {
   if (isTouchDevice) {
     if (isOpen) {
@@ -48,7 +43,6 @@ function togglePanel(panel: HTMLElement, isOpen: boolean): boolean {
   return !isOpen;
 }
 
-// Helper to close all other panels
 function closeOtherPanels(except: string) {
   if (except !== 'inventory' && toggleInventory) {
     toggleInventory = togglePanel(inventoryUI, toggleInventory);
@@ -72,7 +66,6 @@ function closeOtherPanels(except: string) {
   }
 }
 
-// Inventory button
 mobileInventoryBtn?.addEventListener('click', () => {
   closeOtherPanels('inventory');
   toggleInventory = togglePanel(inventoryUI, toggleInventory);
@@ -84,7 +77,6 @@ mobileInventoryBtn?.addEventListener('click', () => {
   updateOverlay();
 });
 
-// Spellbook button
 mobileSpellbookBtn?.addEventListener('click', () => {
   closeOtherPanels('spellbook');
   toggleSpellBook = togglePanel(spellBookUI, toggleSpellBook);
@@ -96,7 +88,6 @@ mobileSpellbookBtn?.addEventListener('click', () => {
   updateOverlay();
 });
 
-// Collectables button
 mobileCollectablesBtn?.addEventListener('click', () => {
   closeOtherPanels('collectables');
   toggleCollectables = togglePanel(collectablesUI, toggleCollectables);
@@ -108,7 +99,6 @@ mobileCollectablesBtn?.addEventListener('click', () => {
   updateOverlay();
 });
 
-// Friends button
 mobileFriendsBtn?.addEventListener('click', () => {
   closeOtherPanels('friends');
   toggleFriendsList = togglePanel(friendsListUI, toggleFriendsList);
@@ -120,7 +110,6 @@ mobileFriendsBtn?.addEventListener('click', () => {
   updateOverlay();
 });
 
-// Guild button
 mobileGuildBtn?.addEventListener('click', () => {
   closeOtherPanels('guild');
   toggleGuild = togglePanel(guildContainer, toggleGuild);
@@ -132,7 +121,6 @@ mobileGuildBtn?.addEventListener('click', () => {
   updateOverlay();
 });
 
-// Close panel when clicking backdrop
 mobileBackdrop?.addEventListener('click', () => {
   if (isTouchDevice) {
     closeOtherPanels('none');

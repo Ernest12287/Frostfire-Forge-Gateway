@@ -43,7 +43,7 @@ const contextActions: Record<string, { allowed_self: boolean, label: string, han
     label: 'Send Message',
     allowed_self: false,
     handler: (id) => {
-      // Update the document to add /w and the player's username
+
       const chatInput = document.getElementById("chat-input") as HTMLInputElement;
       const username = Array.from(cache.players).find(player => player.id === id)?.username;
       if (!username) return;
@@ -85,21 +85,18 @@ const contextActions: Record<string, { allowed_self: boolean, label: string, han
     label: 'Invite to Guild',
     allowed_self: false,
     handler: (id) => {
-      console.log(`Inviting ${id} to guild`);
     }
   },
   'block-player': {
     label: 'Block Player',
     allowed_self: false,
     handler: (id) => {
-      console.log(`Blocking player ${id}`);
     }
   },
   'report-player': {
     label: 'Report Player',
     allowed_self: false,
     handler: (id) => {
-      console.log(`Reporting player ${id}`);
     }
   },
 };
@@ -113,7 +110,6 @@ function createPartyContextMenu(event: MouseEvent, username: string) {
   contextMenu.style.left = `${event.clientX}px`;
   contextMenu.style.top = `${event.clientY}px`;
 
-  // If we are off the screen, adjust position
   if (event.clientX + 200 > window.innerWidth) {
     contextMenu.style.left = `${event.clientX - 200}px`;
   }
@@ -135,8 +131,8 @@ function createPartyContextMenu(event: MouseEvent, username: string) {
   const currentPlayer = Array.from(cache.players).find(player => player.id === cachedPlayerId);
   const isSelf = currentPlayer?.username.toLowerCase() === username.toLowerCase();
   Object.entries(partyContextActions).forEach(([action, { label, handler, only_self, allowed_self }]) => {
-    if (only_self && !isSelf) return; // Skip actions that are only for self
-    if (!allowed_self && isSelf) return; // Skip actions that are not allowed for self
+    if (only_self && !isSelf) return;
+    if (!allowed_self && isSelf) return;
 
     const li = document.createElement("li");
     li.id = `context-${action}`;
@@ -164,7 +160,7 @@ function createContextMenu(event: MouseEvent, id: string) {
   contextMenu.id = 'context-menu';
   contextMenu.style.left = `${event.clientX}px`;
   contextMenu.style.top = `${event.clientY}px`;
-  // If we are off the screen, adjust position
+
   if (event.clientX + 200 > window.innerWidth) {
     contextMenu.style.left = `${event.clientX - 200}px`;
   }
@@ -180,7 +176,7 @@ function createContextMenu(event: MouseEvent, id: string) {
   if (event.clientY - 150 < 0) {
     contextMenu.style.top = `${event.clientY + 50}px`;
   }
-  
+
   contextMenu.dataset.id = id;
 
   const ul = document.createElement("ul");
@@ -193,13 +189,10 @@ function createContextMenu(event: MouseEvent, id: string) {
   Object.entries(contextActions).forEach(([action, { label, handler, allowed_self }]) => {
     if (!allowed_self && isSelf) return;
 
-    // Skip "invite-to-party" if already in party
     if (action === 'invite-to-party' && isInParty) return;
 
-    // Skip "add-friend" if already friends
     if (action === 'add-friend' && isFriend) return;
 
-    // Skip "remove-friend" if not friends
     if (action === 'remove-friend' && !isFriend) return;
 
     const li = document.createElement("li");

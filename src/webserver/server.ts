@@ -5,7 +5,7 @@ import player from "../systems/player";
 import verify from "../services/verification";
 import { hash, randomBytes } from "../modules/hash";
 import query from "../controllers/sqldatabase";
-// Load settings from environment variables
+
 const settings = {
   guest_mode: {
     enabled: process.env.GUEST_MODE_ENABLED === "true" || process.env.GUEST_MODE_ENABLED === "1"
@@ -28,13 +28,10 @@ import forgotpassword_html from "./public/forgot-password.html";
 import changepassword_html from "./public/change-password.html";
 import realmselection_html from "./public/realm-selection.html";
 
-// Load whitelisted and blacklisted IPs and functions
 import { w_ips, b_ips, blacklistAdd } from "../systems/security";
 
-// Load asset loader
 import { initializeAssets } from "../modules/assetloader";
 
-// Load security rules from security.cfg
 const security = fs.existsSync(path.join(import.meta.dir, "./config/security.cfg"))
   ? fs.readFileSync(path.join(import.meta.dir, "./config/security.cfg"), "utf8").split("\n").filter(line => line.trim() !== "" && !line.startsWith("#"))
   : [];
@@ -44,8 +41,6 @@ if (security.length > 0) {
 } else {
   log.warn("No security rules found");
 }
-
-// Assets are loaded by game servers, not the gateway
 
 const _cert = process.env.WEBSRV_CERT_PATH || path.join(import.meta.dir, "../certs/webserver/cert.pem");
 const _key = process.env.WEBSRV_KEY_PATH || path.join(import.meta.dir, "../certs/webserver/key.pem");
@@ -79,8 +74,7 @@ const routes = {
   "/api/gateway/servers": {
     GET: async () => {
       try {
-        // Fetch server list from gateway status endpoint
-        // Gateway runs on same machine, use localhost HTTP for internal communication
+
         const gatewayPort = process.env.GATEWAY_PORT || "9999";
         const gatewayUrl = `http://localhost:${gatewayPort}`;
 
@@ -95,7 +89,6 @@ const routes = {
 
         const data = await response.json();
 
-        // Return all servers (realm selection will show all, user can see which are degraded)
         return new Response(JSON.stringify({
           servers: data.servers || []
         }), {
@@ -117,12 +110,11 @@ const routes = {
   "/api/gateway/connection-token": {
     GET: async (req: Request) => {
       try {
-        // Generate a unique connection token
+
         const token = crypto.randomBytes(32).toString("hex");
         const timestamp = Date.now();
-        const expiresAt = timestamp + (60 * 1000); // Token expires in 60 seconds
+        const expiresAt = timestamp + (60 * 1000);
 
-        // Sign the token with shared secret
         const sharedSecret = process.env.GATEWAY_GAME_SERVER_SECRET || "default-secret-change-me";
         const signature = crypto
           .createHmac("sha256", sharedSecret)
@@ -231,25 +223,24 @@ Bun.serve({
     }
     const ip = address.address;
     log.debug(`Received request: ${req.method} ${req.url} from ${ip}`);
-    // Block potentially dangerous HTTP methods
+
     if (req.method === "CONNECT" || req.method === "TRACE" || req.method === "TRACK" || req.method === "OPTIONS") {
       return new Response("Forbidden", { status: 403 });
     }
-    // Check if the ip is blacklisted
+
     if (b_ips.includes(ip)) {
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
     }
-    // Check if the ip is whitelisted
+
     if (!w_ips.includes(ip)) {
       const path = url.pathname.split("/")[1];
       if (security.includes(path)) {
-        // Ban the IP
+
         await blacklistAdd(ip);
         return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
       }
     }
 
-    // Restrict direct ip access to the webserver (only in production)
     if (process.env.DOMAIN && process.env.DOMAIN !== "http://localhost" && process.env.DOMAIN?.replace(/https?:\/\//, "") !== url.host) {
       log.debug(`Domain mismatch: expected "${process.env.DOMAIN?.replace(/https?:\/\//, "")}", got "${url.host}"`);
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -257,12 +248,10 @@ Bun.serve({
 
     const route = routes[url.pathname as keyof typeof routes];
 
-    // If route exists, handle it
     if (route) {
       return route[req.method as keyof typeof route]?.(req);
     }
 
-    // Unknown routes redirect to homepage
     return Response.redirect("/", 301);
   },
   ...(_https ? {
@@ -275,7 +264,7 @@ Bun.serve({
     }
   : {}),
 });
-// If HTTPS is enabled, also start an HTTP server that redirects to HTTPS
+
 if (_https) {
   Bun.serve({
     hostname: "0.0.0.0",
@@ -285,8 +274,7 @@ if (_https) {
       if (!url) {
         return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
       }
-      // Always redirect to https with same host/path/query
-      // If the port is 443, don't include it in the redirect
+
       const port = process.env.WEBSRV_PORTSSL === "443" ? "" : `:${process.env.WEBSRV_PORTSSL || 443}`;
       return Response.redirect(`https://${url.hostname}${port}${url.pathname}${url.search}`, 301);
     }
@@ -294,7 +282,7 @@ if (_https) {
 }
 
 async function authenticate(req: Request, server: any) {
-  // Check if ip banned
+
   const ip = server.requestIP(req)?.address;
   if (b_ips.includes(ip) && !w_ips.includes(ip)) {
     return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -319,7 +307,6 @@ async function authenticate(req: Request, server: any) {
   await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
   await query("UPDATE accounts SET verification_code = NULL WHERE token = ?", [token]);
 
-  // Send to /game
   return Response.redirect(`${process.env.DOMAIN}/game`, 301);
 }
 
@@ -366,7 +353,7 @@ async function createGuestAccount(req: Request, server: any) {
 
 async function register(req: Request, server: any) {
   try {
-    // Check if ip banned
+
     const ip = server.requestIP(req)?.address;
     if (b_ips.includes(ip) && !w_ips.includes(ip)) {
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -426,7 +413,7 @@ async function register(req: Request, server: any) {
 
 async function login(req: Request, server: any) {
   try {
-    // Check if ip banned
+
     const ip = server.requestIP(req)?.address;
     if (b_ips.includes(ip) && !w_ips.includes(ip)) {
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -456,20 +443,19 @@ async function login(req: Request, server: any) {
     }
 
     if (!settings["2fa"].enabled) {
-      // Update the account to verified
+
       await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
 
-      // Remove any verification code that may exist
       await query("UPDATE accounts SET verification_code = NULL WHERE token = ?", [token]);
-      // 2FA is not enabled, so we can just return the token
+
       return new Response(JSON.stringify({ message: "Logged in successfully"}), { status: 301, headers: { "Set-Cookie": `token=${token}; Path=/; SameSite=Lax` } });
     } else {
-      // 2FA is enabled, so we need to send a verification email
+
       const result = await verify(token, useremail.toLowerCase(), username.toLowerCase()) as any;
       if (result instanceof Error) {
         return new Response(JSON.stringify({ message: "Failed to send verification email" }), { status: 500 });
       }
-      // Return a 200
+
       return new Response(JSON.stringify({ message: "Verification email sent"}), { status: 200, headers: { "Set-Cookie": `token=${token}; Path=/;` } });
     }
   } catch (error) {
@@ -483,7 +469,7 @@ async function resetPassword(req: Request, server: any) {
     return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
   }
   const responseMessage = `If the email you provided is registered, you will receive an email with instructions to reset your password.`;
-      // Check if ip banned
+
     const ip = server.requestIP(req)?.address;
     if (b_ips.includes(ip) && !w_ips.includes(ip)) {
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -500,17 +486,14 @@ async function resetPassword(req: Request, server: any) {
     return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 });
   }
 
-  // Check if the email exists in the database
   const result = await query("SELECT email FROM accounts WHERE email = ? LIMIT 1", [email]) as any;
-  // Don't tip off the user if the email does not exist
+
   if (result.length === 0) {
     return new Response(JSON.stringify({ message: responseMessage }), { status: 200 });
   }
 
-  // Generate a random code to use for password reset verification
   const code = randomBytes(8);
 
-  // Send the email with the reset link
   const gameName = process.env.GAME_NAME || process.env.DOMAIN || "Game";
   const subject = `${gameName} - Reset your password`;
   const url = `${process.env.DOMAIN}/change-password?email=${email}&code=${code}`;
@@ -518,7 +501,7 @@ async function resetPassword(req: Request, server: any) {
   const emailResponse = await sendEmail(email, subject, gameName, message);
   if (emailResponse !== "Email sent successfully") {
     log.error(`Failed to send reset password email: ${emailResponse}`);
-    // We can return a 500 error here because the email doesn't exist in general or the email service failed
+
     return new Response(JSON.stringify({ message: "Failed to send reset password email" }), { status: 500 });
   }
 
@@ -531,7 +514,7 @@ async function updatePassword(req: Request, server: any) {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
   }
-  // Check if ip banned
+
   const ip = server.requestIP(req)?.address;
   if (b_ips.includes(ip) && !w_ips.includes(ip)) {
     return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -554,21 +537,18 @@ async function updatePassword(req: Request, server: any) {
     return new Response(JSON.stringify({ message: "Password must be between 8 and 20 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character." }), { status: 400 });
   }
 
-  // Check if the account exists
   const account = await query("SELECT * FROM accounts WHERE email = ? LIMIT 1", [body.email.toLowerCase()]) as any;
   if (account.length === 0) {
     log.warn(`Attempt to update password for non-existent email: ${body.email.toLowerCase()}`);
     return new Response(JSON.stringify({ message: "Failed to update password" }), { status: 500 });
   }
 
-  // Check if the reset password code matches
   const codeResult = await query("SELECT reset_password_code FROM accounts WHERE email = ? AND reset_password_code = ? LIMIT 1", [body.email.toLowerCase(), body.code]) as any;
   if (codeResult.length === 0) {
     log.warn(`Invalid reset password code for email: ${body.email.toLowerCase()}`);
     return new Response(JSON.stringify({ message: "Invalid reset password code" }), { status: 403 });
   }
 
-  // Update the password
   const hashedPassword = await hash(body.password);
   const updateResult = await query("UPDATE accounts SET password_hash = ?, reset_password_code = NULL, verified = 0, verification_code = NULL WHERE email = ?", [hashedPassword, body.email.toLowerCase()]);
   if (!updateResult) {
@@ -579,7 +559,7 @@ async function updatePassword(req: Request, server: any) {
   log.debug(`Password updated successfully for email: ${body.email.toLowerCase()}`);
 
   if (account.session_id) {
-    // If the user is logged in, we need to logout the user
+
     player.logout(account.session_id);
   }
 

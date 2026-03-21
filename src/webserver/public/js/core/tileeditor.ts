@@ -22,7 +22,6 @@ interface TileChangeGroup {
   changes: TileChange[];
 }
 
-
 interface PanelDragState {
   panel: HTMLElement;
   header: HTMLElement;
@@ -47,30 +46,25 @@ class TileEditor {
   private previewTilePos: { x: number, y: number } | null = null;
   private hoveredTilesetPos: { x: number, y: number } | null = null;
 
-  // Tileset selection state
   private isSelectingTiles: boolean = false;
   private selectionStartTile: { x: number, y: number } | null = null;
   private selectionEndTile: { x: number, y: number } | null = null;
-  private selectedTiles: number[][] = []; // 2D array of selected tile IDs
+  private selectedTiles: number[][] = [];
 
-  // Tileset pan state
   private isPanningTileset: boolean = false;
   private tilesetPanStartX: number = 0;
   private tilesetPanStartY: number = 0;
   private tilesetScrollStartX: number = 0;
   private tilesetScrollStartY: number = 0;
 
-  // Resize state
   private isResizing: boolean = false;
   private resizeStartX: number = 0;
   private resizeStartY: number = 0;
   private resizeStartWidth: number = 0;
   private resizeStartHeight: number = 0;
 
-  // Panel drag state
   private panels: Map<string, PanelDragState> = new Map();
 
-  // UI Elements
   private container: HTMLElement;
   private toolbarPanel: HTMLElement;
   private layersPanel: HTMLElement;
@@ -94,13 +88,12 @@ class TileEditor {
   private resizeHandle: HTMLElement;
 
   constructor() {
-    // Get UI elements
+
     this.container = document.getElementById('tile-editor-container') as HTMLElement;
     this.toolbarPanel = document.getElementById('tile-editor-toolbar-panel') as HTMLElement;
     this.layersPanel = document.getElementById('tile-editor-layers-panel') as HTMLElement;
     this.tilesetPanel = document.getElementById('tile-editor-tileset-panel') as HTMLElement;
 
-    // Toolbar and layers don't have headers, so use the panels themselves as draggable elements
     this.tilesetHeader = this.tilesetPanel.querySelector('.te-panel-header') as HTMLElement;
     this.resizeHandle = this.tilesetPanel.querySelector('.te-resize-handle') as HTMLElement;
 
@@ -125,11 +118,10 @@ class TileEditor {
   }
 
   private initializePanels() {
-    // Initialize panel drag state
-    // Toolbar: entire panel is draggable (no header)
+
     this.panels.set('toolbar', {
       panel: this.toolbarPanel,
-      header: this.toolbarPanel, // Use panel as header for dragging
+      header: this.toolbarPanel,
       isDragging: false,
       startX: 0,
       startY: 0,
@@ -137,10 +129,9 @@ class TileEditor {
       offsetY: 0
     });
 
-    // Layers: entire panel is draggable (no header)
     this.panels.set('layers', {
       panel: this.layersPanel,
-      header: this.layersPanel, // Use panel as header for dragging
+      header: this.layersPanel,
       isDragging: false,
       startX: 0,
       startY: 0,
@@ -158,17 +149,15 @@ class TileEditor {
       offsetY: 0
     });
 
-    // Load saved positions
     this.loadPanelPositions();
 
-    // Setup close buttons
     const closeButtons = document.querySelectorAll('.te-panel-close');
     closeButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         const panelType = target.getAttribute('data-panel');
         if (panelType === 'tileset') {
-          // Close the entire tile editor when closing the main tileset panel
+
           this.toggle();
         }
       });
@@ -176,18 +165,17 @@ class TileEditor {
   }
 
   private setupEventListeners() {
-    // Tool buttons
+
     this.paintBtn.addEventListener('click', () => this.setTool('paint'));
     this.eraseBtn.addEventListener('click', () => this.setTool('erase'));
     this.copyBtn.addEventListener('click', () => this.setTool('copy'));
     this.pasteBtn.addEventListener('click', () => {
-      // Only allow switching to paste if there's a copied tile
+
       if (this.copiedTile !== null) {
         this.setTool('paste');
       }
     });
 
-    // Action buttons
     this.undoBtn.addEventListener('click', () => this.undo());
     this.redoBtn.addEventListener('click', () => this.redo());
     this.saveBtn.addEventListener('click', () => this.save());
@@ -195,7 +183,6 @@ class TileEditor {
     this.toggleOpacityBtn.addEventListener('click', () => this.toggleLayerOpacity());
     this.toggleGridBtn.addEventListener('click', () => this.toggleGrid());
 
-    // Setup drag for each panel
     this.panels.forEach((panelState, id) => {
       panelState.header.addEventListener('mousedown', (e) => this.onPanelDragStart(id, e));
     });
@@ -203,30 +190,25 @@ class TileEditor {
     document.addEventListener('mousemove', (e) => this.onPanelDrag(e));
     document.addEventListener('mouseup', () => this.onPanelDragEnd());
 
-    // Tileset canvas events
     this.tilesetCanvas.addEventListener('mousedown', (e) => this.onTilesetMouseDown(e));
     this.tilesetCanvas.addEventListener('mousemove', (e) => this.onTilesetMouseMove(e));
     this.tilesetCanvas.addEventListener('mouseup', (e) => this.onTilesetMouseUp(e));
     this.tilesetCanvas.addEventListener('mouseleave', () => this.onTilesetMouseLeave());
 
-    // Tileset panning events (middle mouse button)
     this.tilesetContainer.addEventListener('mousedown', (e) => this.onTilesetPanStart(e));
     this.tilesetContainer.addEventListener('mousemove', (e) => this.onTilesetPan(e));
     this.tilesetContainer.addEventListener('mouseup', (e) => this.onTilesetPanEnd(e));
     this.tilesetContainer.addEventListener('mouseleave', (e) => this.onTilesetPanEnd(e));
 
-    // Resize handle events
     this.resizeHandle.addEventListener('mousedown', (e) => this.onResizeStart(e));
     document.addEventListener('mousemove', (e) => this.onResize(e));
     document.addEventListener('mouseup', () => this.onResizeEnd());
 
-    // Game canvas events for tile placement
     canvas.addEventListener('mousemove', (e) => this.onMapMouseMove(e));
     canvas.addEventListener('mousedown', (e) => this.onMapMouseDown(e));
     canvas.addEventListener('mouseup', () => this.onMapMouseUp());
     canvas.addEventListener('mouseleave', () => this.onMapMouseUp());
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => this.onKeyDown(e));
   }
 
@@ -235,17 +217,16 @@ class TileEditor {
     this.container.style.display = this.isActive ? 'block' : 'none';
 
     if (this.isActive) {
-      // Show all panels when opening
+
       this.panels.forEach(panelState => {
         panelState.panel.style.display = 'flex';
       });
       this.initialize();
     } else {
-      // Turn off debug checkboxes when closing tile editor
+
       collisionTilesDebugCheckbox.checked = false;
       noPvpDebugCheckbox.checked = false;
 
-      // Turn off grid when closing tile editor
       const gridCheckbox = document.getElementById('show-grid-checkbox') as HTMLInputElement;
       if (gridCheckbox) {
         gridCheckbox.checked = false;
@@ -257,16 +238,12 @@ class TileEditor {
   private initialize() {
     if (!window.mapData) return;
 
-    // Load layers
     this.loadLayers();
 
-    // Load tilesets
     this.loadTilesets();
 
-    // Update paste button state
     this.updatePasteButtonState();
 
-    // Ensure opacity button starts inactive
     this.toggleOpacityBtn.classList.remove('active');
   }
 
@@ -275,11 +252,9 @@ class TileEditor {
 
     this.layersList.innerHTML = '';
 
-    // Get a sample chunk to read layer information
     const firstChunk = window.mapData.loadedChunks.values().next().value;
     if (!firstChunk) return;
 
-    // Include all layers (including collision and no-pvp) and sort by zIndex
     const layers = firstChunk.layers
       .sort((a: any, b: any) => a.zIndex - b.zIndex);
 
@@ -287,7 +262,6 @@ class TileEditor {
       const layerItem = document.createElement('div');
       layerItem.className = 'te-layer-item ui';
 
-      // Add visual indicators for special layers
       const isCollision = layer.name.toLowerCase().includes('collision');
       const isNoPvp = layer.name.toLowerCase().includes('nopvp') || layer.name.toLowerCase().includes('no-pvp');
 
@@ -303,7 +277,6 @@ class TileEditor {
       this.layersList.appendChild(layerItem);
     });
 
-    // Select first non-special layer by default
     if (layers.length > 0) {
       const firstNonSpecial = layers.find((l: any) => {
         const name = l.name.toLowerCase();
@@ -316,7 +289,6 @@ class TileEditor {
   private selectLayer(layerName: string) {
     this.selectedLayer = layerName;
 
-    // Update UI
     const layerItems = this.layersList.querySelectorAll('.te-layer-item');
     layerItems.forEach((item) => {
       if (item.textContent?.includes(layerName)) {
@@ -326,15 +298,12 @@ class TileEditor {
       }
     });
 
-    // Toggle debug checkboxes based on layer type
     const lowerName = layerName.toLowerCase();
     const isCollision = lowerName.includes('collision');
     const isNoPvp = lowerName.includes('nopvp') || lowerName.includes('no-pvp');
 
-    // Enable/disable collision tiles debug
     collisionTilesDebugCheckbox.checked = isCollision;
 
-    // Enable/disable no-pvp debug
     noPvpDebugCheckbox.checked = isNoPvp;
   }
 
@@ -348,12 +317,11 @@ class TileEditor {
       const tabName = tileset.name || `Tileset ${index + 1}`;
       tab.className = 'te-tileset-tab ui';
       tab.textContent = tabName;
-      tab.title = tabName; // Show full name on hover
+      tab.title = tabName;
       tab.addEventListener('click', () => this.selectTileset(index));
       this.tilesetTabs.appendChild(tab);
     });
 
-    // Select first tileset by default
     if (window.mapData.tilesets.length > 0) {
       this.selectTileset(0);
     }
@@ -362,7 +330,6 @@ class TileEditor {
   private selectTileset(index: number) {
     this.currentTilesetIndex = index;
 
-    // Update tabs UI
     const tabs = this.tilesetTabs.querySelectorAll('.te-tileset-tab');
     tabs.forEach((tab, i) => {
       if (i === index) {
@@ -372,7 +339,6 @@ class TileEditor {
       }
     });
 
-    // Draw tileset on canvas
     this.drawTileset();
   }
 
@@ -384,16 +350,13 @@ class TileEditor {
 
     if (!image || !tileset) return;
 
-    // Set canvas size to tileset size with scale
     const scale = 1;
     this.tilesetCanvas.width = tileset.imagewidth * scale;
     this.tilesetCanvas.height = tileset.imageheight * scale;
 
-    // Draw tileset image
     this.tilesetCtx.imageSmoothingEnabled = false;
     this.tilesetCtx.drawImage(image, 0, 0, tileset.imagewidth * scale, tileset.imageheight * scale);
 
-    // Draw grid
     this.tilesetCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     this.tilesetCtx.lineWidth = 1;
 
@@ -416,7 +379,6 @@ class TileEditor {
       this.tilesetCtx.stroke();
     }
 
-    // Draw active selection rectangle (while dragging)
     if (this.isSelectingTiles && this.selectionStartTile && this.selectionEndTile) {
       const minX = Math.min(this.selectionStartTile.x, this.selectionEndTile.x);
       const maxX = Math.max(this.selectionStartTile.x, this.selectionEndTile.x);
@@ -440,12 +402,11 @@ class TileEditor {
         (maxY - minY + 1) * tileHeight
       );
     }
-    // Draw selected tiles highlight (after selection complete)
+
     else if (this.selectedTiles.length > 0) {
       const height = this.selectedTiles.length;
       const width = this.selectedTiles[0].length;
 
-      // Find the top-left tile position in tileset coordinates
       const firstTileId = this.selectedTiles[0][0];
       if (firstTileId >= tileset.firstgid && firstTileId < tileset.firstgid + tileset.tilecount) {
         const localTileId = firstTileId - tileset.firstgid;
@@ -471,7 +432,7 @@ class TileEditor {
         );
       }
     }
-    // Draw single selected tile highlight (blue outline)
+
     else if (this.selectedTile && this.selectedTile >= tileset.firstgid && this.selectedTile < tileset.firstgid + tileset.tilecount) {
       const localTileId = this.selectedTile - tileset.firstgid;
       const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
@@ -488,7 +449,6 @@ class TileEditor {
       );
     }
 
-    // Draw hover highlight (only when not selecting)
     if (this.hoveredTilesetPos && !this.isSelectingTiles) {
       this.tilesetCtx.fillStyle = 'rgba(0, 150, 255, 0.4)';
       this.tilesetCtx.fillRect(
@@ -501,7 +461,7 @@ class TileEditor {
   }
 
   private onTilesetMouseDown(e: MouseEvent) {
-    if (!window.mapData || e.button !== 0) return; // Only left click
+    if (!window.mapData || e.button !== 0) return;
 
     const tileset = window.mapData.tilesets[this.currentTilesetIndex];
     if (!tileset) return;
@@ -509,7 +469,6 @@ class TileEditor {
     const rect = this.tilesetCanvas.getBoundingClientRect();
     const containerRect = this.tilesetContainer.getBoundingClientRect();
 
-    // Check if click is within the visible container area
     if (e.clientX < containerRect.left || e.clientX > containerRect.right ||
         e.clientY < containerRect.top || e.clientY > containerRect.bottom) {
       return;
@@ -522,7 +481,6 @@ class TileEditor {
     const tileX = Math.floor(x / tileset.tilewidth);
     const tileY = Math.floor(y / tileset.tileheight);
 
-    // Start selection
     this.isSelectingTiles = true;
     this.selectionStartTile = { x: tileX, y: tileY };
     this.selectionEndTile = { x: tileX, y: tileY };
@@ -538,7 +496,6 @@ class TileEditor {
     const tileset = window.mapData.tilesets[this.currentTilesetIndex];
     if (!tileset || !this.selectionStartTile || !this.selectionEndTile) return;
 
-    // Calculate selection bounds
     const minX = Math.min(this.selectionStartTile.x, this.selectionEndTile.x);
     const maxX = Math.max(this.selectionStartTile.x, this.selectionEndTile.x);
     const minY = Math.min(this.selectionStartTile.y, this.selectionEndTile.y);
@@ -546,7 +503,6 @@ class TileEditor {
 
     const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
 
-    // Build 2D array of selected tiles
     this.selectedTiles = [];
     for (let y = minY; y <= maxY; y++) {
       const row: number[] = [];
@@ -558,17 +514,14 @@ class TileEditor {
       this.selectedTiles.push(row);
     }
 
-    // For single tile selection, set selectedTile for backward compatibility
     if (this.selectedTiles.length === 1 && this.selectedTiles[0].length === 1) {
       this.selectedTile = this.selectedTiles[0][0];
     } else {
-      this.selectedTile = null; // Clear single tile when multi-selecting
+      this.selectedTile = null;
     }
 
-    // Always switch to paint mode when selecting from tileset
     this.setTool('paint');
 
-    console.log('Selected tiles:', this.selectedTiles);
     this.drawTileset();
   }
 
@@ -586,14 +539,12 @@ class TileEditor {
     const tileX = Math.floor(x / tileset.tilewidth);
     const tileY = Math.floor(y / tileset.tileheight);
 
-    // If selecting, update end position
     if (this.isSelectingTiles) {
       this.selectionEndTile = { x: tileX, y: tileY };
       this.drawTileset();
       return;
     }
 
-    // Only update hover if the hovered tile changed
     if (!this.hoveredTilesetPos || this.hoveredTilesetPos.x !== tileX || this.hoveredTilesetPos.y !== tileY) {
       this.hoveredTilesetPos = { x: tileX, y: tileY };
       this.drawTileset();
@@ -601,7 +552,7 @@ class TileEditor {
   }
 
   private onTilesetMouseLeave() {
-    // End selection if dragging out
+
     if (this.isSelectingTiles) {
       this.isSelectingTiles = false;
       this.drawTileset();
@@ -625,7 +576,6 @@ class TileEditor {
 
     this.previewTilePos = { x: tileX, y: tileY };
 
-    // If mouse is down and paint tool, continue painting
     if (this.isMouseDown && this.currentTool === 'paint') {
       this.placeTile(tileX, tileY);
     } else if (this.isMouseDown && this.currentTool === 'erase') {
@@ -638,7 +588,6 @@ class TileEditor {
   private onMapMouseDown(e: MouseEvent) {
     if (!this.isActive || !window.mapData) return;
 
-    // Don't interfere with clicks on the editor UI itself
     if ((e.target as HTMLElement).closest('#tile-editor-container')) {
       return;
     }
@@ -647,18 +596,15 @@ class TileEditor {
     const tileX = Math.floor(worldPos.x / window.mapData.tilewidth);
     const tileY = Math.floor(worldPos.y / window.mapData.tileheight);
 
-    // Right click - copy tile from world
     if (e.button === 2) {
       e.preventDefault();
       this.copyTileFromWorld(tileX, tileY);
       return;
     }
 
-    // Left click
     if (e.button === 0) {
       this.isMouseDown = true;
 
-      console.log(`Tile editor click: tile (${tileX}, ${tileY}), tool: ${this.currentTool}, selectedTile: ${this.selectedTile}`);
 
       if (this.currentTool === 'paint') {
         this.placeTile(tileX, tileY);
@@ -680,27 +626,22 @@ class TileEditor {
 
     const target = e.target as HTMLElement;
 
-    // Don't start drag if clicking on close button
     if (target.classList.contains('te-panel-close')) return;
 
-    // Don't start drag if clicking on a button in the toolbar
     if (panelId === 'toolbar' && target.tagName === 'BUTTON') return;
 
-    // Don't start drag if clicking on a layer item in the layers panel
     if (panelId === 'layers' && (target.classList.contains('te-layer-item') || target.closest('.te-layer-item'))) return;
 
     panelState.isDragging = true;
     panelState.startX = e.clientX;
     panelState.startY = e.clientY;
 
-    // Get current position of panel
     const rect = panelState.panel.getBoundingClientRect();
     panelState.offsetX = rect.left;
     panelState.offsetY = rect.top;
 
-    // Change cursor
     panelState.header.style.cursor = 'grabbing';
-    panelState.panel.style.zIndex = '1001'; // Bring to front
+    panelState.panel.style.zIndex = '1001';
   }
 
   private onPanelDrag(e: MouseEvent) {
@@ -713,7 +654,6 @@ class TileEditor {
       let newX = panelState.offsetX + deltaX;
       let newY = panelState.offsetY + deltaY;
 
-      // Constrain to viewport bounds
       const panelRect = panelState.panel.getBoundingClientRect();
       const maxX = window.innerWidth - panelRect.width;
       const maxY = window.innerHeight - panelRect.height;
@@ -721,7 +661,6 @@ class TileEditor {
       newX = Math.max(0, Math.min(newX, maxX));
       newY = Math.max(0, Math.min(newY, maxY));
 
-      // Update position and clear transform to avoid conflicts with initial CSS positioning
       panelState.panel.style.transform = 'none';
       panelState.panel.style.left = `${newX}px`;
       panelState.panel.style.top = `${newY}px`;
@@ -735,7 +674,7 @@ class TileEditor {
       if (!panelState.isDragging) return;
 
       panelState.isDragging = false;
-      // Reset cursor - toolbar and layers use grab on the panel, tileset uses grab on header
+
       if (id === 'toolbar' || id === 'layers') {
         panelState.panel.style.cursor = 'grab';
       } else {
@@ -743,13 +682,12 @@ class TileEditor {
       }
       panelState.panel.style.zIndex = '1000';
 
-      // Save position
       this.savePanelPosition(id, panelState.panel);
     });
   }
 
   private onTilesetPanStart(e: MouseEvent) {
-    // Only pan with middle mouse button
+
     if (e.button !== 1) return;
 
     e.preventDefault();
@@ -759,7 +697,6 @@ class TileEditor {
     this.tilesetScrollStartX = this.tilesetContainer.scrollLeft;
     this.tilesetScrollStartY = this.tilesetContainer.scrollTop;
 
-    // Change cursor
     this.tilesetContainer.style.cursor = 'grabbing';
   }
 
@@ -771,7 +708,6 @@ class TileEditor {
     const deltaX = e.clientX - this.tilesetPanStartX;
     const deltaY = e.clientY - this.tilesetPanStartY;
 
-    // Update scroll position (inverted for natural panning feel)
     this.tilesetContainer.scrollLeft = this.tilesetScrollStartX - deltaX;
     this.tilesetContainer.scrollTop = this.tilesetScrollStartY - deltaY;
   }
@@ -793,7 +729,6 @@ class TileEditor {
     this.resizeStartWidth = this.tilesetPanel.offsetWidth;
     this.resizeStartHeight = this.tilesetPanel.offsetHeight;
 
-    // Disable transitions during resize for smoother experience
     this.tilesetPanel.style.transition = 'none';
   }
 
@@ -808,7 +743,6 @@ class TileEditor {
     let newWidth = this.resizeStartWidth + deltaX;
     let newHeight = this.resizeStartHeight + deltaY;
 
-    // Apply constraints from CSS
     const minWidth = 400;
     const minHeight = 300;
     const maxWidth = window.innerWidth * 0.9;
@@ -825,7 +759,7 @@ class TileEditor {
     if (!this.isResizing) return;
 
     this.isResizing = false;
-    // Re-enable transitions
+
     this.tilesetPanel.style.transition = '';
   }
 
@@ -838,7 +772,7 @@ class TileEditor {
       this.panels.forEach((panelState, id) => {
         const position = positions[id];
         if (position) {
-          panelState.panel.style.transform = 'none'; // Clear CSS transform
+          panelState.panel.style.transform = 'none';
           panelState.panel.style.left = `${position.x}px`;
           panelState.panel.style.top = `${position.y}px`;
           panelState.panel.style.right = 'auto';
@@ -846,7 +780,7 @@ class TileEditor {
         }
       });
     } catch (e) {
-      console.warn('Failed to load tile editor panel positions:', e);
+      console.error('Error loading panel positions:', e);
     }
   }
 
@@ -863,15 +797,14 @@ class TileEditor {
 
       localStorage.setItem('tile-editor-panel-positions', JSON.stringify(positions));
     } catch (e) {
-      console.warn('Failed to save tile editor panel position:', e);
+      console.error('Error saving panel position:', e);
     }
   }
 
   private resetPanelPositions() {
-    // Clear saved positions from localStorage
+
     localStorage.removeItem('tile-editor-panel-positions');
 
-    // Reset each panel to its default CSS position
     this.panels.forEach(panelState => {
       panelState.panel.style.left = '';
       panelState.panel.style.top = '';
@@ -880,24 +813,20 @@ class TileEditor {
       panelState.panel.style.transform = '';
     });
 
-    // Reset tileset panel size
     this.tilesetPanel.style.width = '';
     this.tilesetPanel.style.height = '';
 
-    console.log('Panel positions and sizes reset to default');
   }
 
   private toggleLayerOpacity() {
     this.dimOtherLayers = !this.dimOtherLayers;
 
-    // Update button visual state
     if (this.dimOtherLayers) {
       this.toggleOpacityBtn.classList.add('active');
     } else {
       this.toggleOpacityBtn.classList.remove('active');
     }
 
-    console.log('Layer opacity toggled:', this.dimOtherLayers ? 'Dimming non-selected layers' : 'Showing all layers normally');
   }
 
   public shouldDimLayer(layerName: string): boolean {
@@ -909,19 +838,17 @@ class TileEditor {
     if (gridCheckbox) {
       gridCheckbox.checked = !gridCheckbox.checked;
 
-      // Update button visual state
       if (gridCheckbox.checked) {
         this.toggleGridBtn.classList.add('active');
       } else {
         this.toggleGridBtn.classList.remove('active');
       }
 
-      console.log('Grid toggled:', gridCheckbox.checked ? 'On' : 'Off');
     }
   }
 
   private screenToWorld(screenX: number, screenY: number): { x: number, y: number } {
-    // Get camera position from renderer (you may need to export these from renderer.ts)
+
     const cameraX = (window as any).cameraX || 0;
     const cameraY = (window as any).cameraY || 0;
 
@@ -934,13 +861,11 @@ class TileEditor {
   private placeTile(tileX: number, tileY: number) {
     if (!this.selectedLayer || !window.mapData) return;
 
-    // Handle multi-tile placement
     if (this.selectedTiles.length > 0) {
       this.placeMultipleTiles(tileX, tileY);
       return;
     }
 
-    // Handle single tile placement
     if (!this.selectedTile) return;
 
     const chunkSize = window.mapData.chunkSize;
@@ -960,9 +885,8 @@ class TileEditor {
     const tileIndex = localTileY * chunk.width + localTileX;
     const oldTileId = layer.data[tileIndex];
 
-    if (oldTileId === this.selectedTile) return; // No change
+    if (oldTileId === this.selectedTile) return;
 
-    // Record change for undo
     this.undoStack.push({
       chunkX,
       chunkY,
@@ -972,12 +896,10 @@ class TileEditor {
       oldTileId,
       newTileId: this.selectedTile
     });
-    this.redoStack = []; // Clear redo stack on new action
+    this.redoStack = [];
 
-    // Update tile data
     layer.data[tileIndex] = this.selectedTile;
 
-    // Re-render chunk
     this.rerenderChunk(chunkX, chunkY);
   }
 
@@ -988,7 +910,6 @@ class TileEditor {
     const affectedChunks = new Set<string>();
     const changeGroup: TileChange[] = [];
 
-    // Place each tile in the selection
     for (let row = 0; row < this.selectedTiles.length; row++) {
       for (let col = 0; col < this.selectedTiles[row].length; col++) {
         const tileId = this.selectedTiles[row][col];
@@ -1011,9 +932,8 @@ class TileEditor {
         const tileIndex = localTileY * chunk.width + localTileX;
         const oldTileId = layer.data[tileIndex];
 
-        if (oldTileId === tileId) continue; // No change
+        if (oldTileId === tileId) continue;
 
-        // Record change in group
         changeGroup.push({
           chunkX,
           chunkY,
@@ -1024,21 +944,17 @@ class TileEditor {
           newTileId: tileId
         });
 
-        // Update tile data
         layer.data[tileIndex] = tileId;
 
-        // Track affected chunk
         affectedChunks.add(chunkKey);
       }
     }
 
-    // Push entire group as one undo action
     if (changeGroup.length > 0) {
       this.undoStack.push({ changes: changeGroup });
-      this.redoStack = []; // Clear redo stack on new action
+      this.redoStack = [];
     }
 
-    // Re-render all affected chunks
     affectedChunks.forEach(chunkKey => {
       const [chunkX, chunkY] = chunkKey.split('-').map(Number);
       this.rerenderChunk(chunkX, chunkY);
@@ -1065,9 +981,8 @@ class TileEditor {
     const tileIndex = localTileY * chunk.width + localTileX;
     const oldTileId = layer.data[tileIndex];
 
-    if (oldTileId === 0) return; // Already empty
+    if (oldTileId === 0) return;
 
-    // Record change for undo
     this.undoStack.push({
       chunkX,
       chunkY,
@@ -1079,10 +994,8 @@ class TileEditor {
     });
     this.redoStack = [];
 
-    // Erase tile
     layer.data[tileIndex] = 0;
 
-    // Re-render chunk
     this.rerenderChunk(chunkX, chunkY);
   }
 
@@ -1106,14 +1019,11 @@ class TileEditor {
     const tileIndex = localTileY * chunk.width + localTileX;
     const tileId = layer.data[tileIndex];
 
-    // Copy the tile and switch directly to paste mode
     this.copiedTile = tileId;
 
-    // If copying a non-empty tile, select it in the tileset
     if (tileId > 0) {
       this.selectedTile = tileId;
 
-      // Switch to the tileset that contains this tile
       const tilesetIndex = window.mapData.tilesets.findIndex((t: any) =>
         t.firstgid <= tileId && tileId < t.firstgid + t.tilecount
       );
@@ -1121,21 +1031,19 @@ class TileEditor {
       if (tilesetIndex !== -1 && tilesetIndex !== this.currentTilesetIndex) {
         this.selectTileset(tilesetIndex);
       } else if (tilesetIndex !== -1) {
-        // Same tileset, just redraw to show selection
+
         this.drawTileset();
       }
 
-      // Auto-scroll to the selected tile
       this.scrollToSelectedTile();
     }
 
     this.setTool('paste');
     this.updatePasteButtonState();
-    console.log('Copied tile:', tileId, '- switched to paste mode');
   }
 
   private pasteTile(tileX: number, tileY: number) {
-    // Allow pasting tile ID 0 (empty tile), so check for null instead of falsy
+
     if (this.copiedTile === null || !this.selectedLayer || !window.mapData) return;
 
     const chunkSize = window.mapData.chunkSize;
@@ -1155,9 +1063,8 @@ class TileEditor {
     const tileIndex = localTileY * chunk.width + localTileX;
     const oldTileId = layer.data[tileIndex];
 
-    if (oldTileId === this.copiedTile) return; // No change
+    if (oldTileId === this.copiedTile) return;
 
-    // Record change for undo (copiedTile can be 0 for empty tiles)
     this.undoStack.push({
       chunkX,
       chunkY,
@@ -1167,12 +1074,10 @@ class TileEditor {
       oldTileId,
       newTileId: this.copiedTile
     });
-    this.redoStack = []; // Clear redo stack on new action
+    this.redoStack = [];
 
-    // Update tile data (can be 0 to clear a tile)
     layer.data[tileIndex] = this.copiedTile;
 
-    // Re-render chunk
     this.rerenderChunk(chunkX, chunkY);
   }
 
@@ -1183,13 +1088,11 @@ class TileEditor {
     const chunk = window.mapData.loadedChunks.get(chunkKey);
     if (!chunk) return;
 
-    // Re-render chunk canvases
     const { lowerCanvas, upperCanvas } = await renderChunkToCanvas(chunk);
     chunk.lowerCanvas = lowerCanvas;
     chunk.upperCanvas = upperCanvas;
-    chunk.canvas = lowerCanvas; // Keep for backwards compatibility
+    chunk.canvas = lowerCanvas;
 
-    console.log(`Chunk ${chunkX}-${chunkY} re-rendered`);
   }
 
   private undo() {
@@ -1198,9 +1101,8 @@ class TileEditor {
 
     const affectedChunks = new Set<string>();
 
-    // Check if it's a group or single change
     if ('changes' in item) {
-      // Handle group of changes
+
       const group = item as TileChangeGroup;
       group.changes.forEach(change => {
         const chunkKey = `${change.chunkX}-${change.chunkY}`;
@@ -1217,7 +1119,7 @@ class TileEditor {
       });
       this.redoStack.push(group);
     } else {
-      // Handle single change
+
       const change = item as TileChange;
       const chunkKey = `${change.chunkX}-${change.chunkY}`;
       const chunk = window.mapData.loadedChunks.get(chunkKey);
@@ -1233,7 +1135,6 @@ class TileEditor {
       this.redoStack.push(change);
     }
 
-    // Re-render all affected chunks
     affectedChunks.forEach(chunkKey => {
       const [chunkX, chunkY] = chunkKey.split('-').map(Number);
       this.rerenderChunk(chunkX, chunkY);
@@ -1246,9 +1147,8 @@ class TileEditor {
 
     const affectedChunks = new Set<string>();
 
-    // Check if it's a group or single change
     if ('changes' in item) {
-      // Handle group of changes
+
       const group = item as TileChangeGroup;
       group.changes.forEach(change => {
         const chunkKey = `${change.chunkX}-${change.chunkY}`;
@@ -1265,7 +1165,7 @@ class TileEditor {
       });
       this.undoStack.push(group);
     } else {
-      // Handle single change
+
       const change = item as TileChange;
       const chunkKey = `${change.chunkX}-${change.chunkY}`;
       const chunk = window.mapData.loadedChunks.get(chunkKey);
@@ -1281,7 +1181,6 @@ class TileEditor {
       this.undoStack.push(change);
     }
 
-    // Re-render all affected chunks
     affectedChunks.forEach(chunkKey => {
       const [chunkX, chunkY] = chunkKey.split('-').map(Number);
       this.rerenderChunk(chunkX, chunkY);
@@ -1289,19 +1188,15 @@ class TileEditor {
   }
 
   private save() {
-    console.log('Saving map changes...');
 
-    // Check if there are any changes to save
     if (this.undoStack.length === 0) {
-      console.log('No changes to save');
       return;
     }
 
-    // Group changes by chunk
     const chunkChanges = new Map<string, any>();
 
     this.undoStack.forEach(item => {
-      // Handle both single changes and change groups
+
       const changes: TileChange[] = 'changes' in item ? item.changes : [item as TileChange];
 
       changes.forEach(change => {
@@ -1310,7 +1205,7 @@ class TileEditor {
         if (!chunkChanges.has(chunkKey)) {
           const chunk = window.mapData.loadedChunks.get(chunkKey);
           if (chunk) {
-            // Deep copy the chunk data
+
             chunkChanges.set(chunkKey, {
               chunkX: change.chunkX,
               chunkY: change.chunkY,
@@ -1327,15 +1222,11 @@ class TileEditor {
       });
     });
 
-    // Convert map to array for sending
     const chunks = Array.from(chunkChanges.values());
 
-    console.log(`Saving ${chunks.length} modified chunks...`);
     chunks.forEach(chunk => {
-      console.log(`  Chunk at (${chunk.chunkX}, ${chunk.chunkY})`);
     });
 
-    // Send modified chunks to server
     sendRequest({
       type: 'SAVE_MAP',
       data: {
@@ -1344,12 +1235,10 @@ class TileEditor {
       }
     });
 
-    // Clear cached chunks so they reload with new data
     chunks.forEach(chunk => {
       clearChunkFromCache(window.mapData.name, chunk.chunkX, chunk.chunkY);
     });
 
-    // Clear undo/redo stacks after save
     this.undoStack = [];
     this.redoStack = [];
   }
@@ -1357,7 +1246,6 @@ class TileEditor {
   private setTool(tool: 'paint' | 'erase' | 'copy' | 'paste') {
     this.currentTool = tool;
 
-    // Update UI
     this.paintBtn.classList.toggle('active', tool === 'paint');
     this.eraseBtn.classList.toggle('active', tool === 'erase');
     this.copyBtn.classList.toggle('active', tool === 'copy');
@@ -1367,24 +1255,21 @@ class TileEditor {
   private onKeyDown(e: KeyboardEvent) {
     if (!this.isActive) return;
 
-    // Don't trigger hotkeys when typing in input fields
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
       return;
     }
 
-    // Tool shortcuts
     if (e.key === 'p') this.setTool('paint');
     if (e.key === 'e') this.setTool('erase');
     if (e.key === 'c') this.setTool('copy');
     if (e.key === 'v') {
-      // Only allow switching to paste if there's a copied tile
+
       if (this.copiedTile !== null) {
         this.setTool('paste');
       }
     }
 
-    // Undo/Redo
     if (e.ctrlKey && e.key === 'z') {
       e.preventDefault();
       this.undo();
@@ -1396,7 +1281,7 @@ class TileEditor {
   }
 
   private updatePasteButtonState() {
-    // Disable paste button if nothing is copied
+
     if (this.copiedTile === null) {
       (this.pasteBtn as HTMLButtonElement).disabled = true;
       this.pasteBtn.style.opacity = '0.5';
@@ -1414,7 +1299,6 @@ class TileEditor {
     const tileset = window.mapData.tilesets[this.currentTilesetIndex];
     if (!tileset) return;
 
-    // Check if selected tile is in current tileset
     if (this.selectedTile < tileset.firstgid || this.selectedTile >= tileset.firstgid + tileset.tilecount) {
       return;
     }
@@ -1424,19 +1308,15 @@ class TileEditor {
     const tileX = (localTileId % tilesPerRow);
     const tileY = Math.floor(localTileId / tilesPerRow);
 
-    // Calculate pixel position of the tile in the canvas
     const tilePixelX = tileX * tileset.tilewidth;
     const tilePixelY = tileY * tileset.tileheight;
 
-    // Get the container dimensions
     const containerWidth = this.tilesetContainer.clientWidth;
     const containerHeight = this.tilesetContainer.clientHeight;
 
-    // Calculate the desired scroll position to center the tile
     const scrollLeft = tilePixelX - (containerWidth / 2) + (tileset.tilewidth / 2);
     const scrollTop = tilePixelY - (containerHeight / 2) + (tileset.tileheight / 2);
 
-    // Smooth scroll to the tile
     this.tilesetContainer.scrollTo({
       left: Math.max(0, scrollLeft),
       top: Math.max(0, scrollTop),
@@ -1450,13 +1330,12 @@ class TileEditor {
     ctx.save();
     ctx.globalAlpha = 0.6;
 
-    // Handle multi-tile preview
     if (this.currentTool === 'paint' && this.selectedTiles.length > 0) {
       try {
         for (let row = 0; row < this.selectedTiles.length; row++) {
           for (let col = 0; col < this.selectedTiles[row].length; col++) {
             const tileId = this.selectedTiles[row][col];
-            if (tileId === 0) continue; // Skip empty tiles
+            if (tileId === 0) continue;
 
             const tileset = window.mapData.tilesets.find((t: any) =>
               t.firstgid <= tileId && tileId < t.firstgid + t.tilecount
@@ -1485,18 +1364,16 @@ class TileEditor {
           }
         }
       } catch (e) {
-        console.error('Error drawing multi-tile preview:', e);
+        console.error('Error drawing preview tile:', e);
       }
       ctx.restore();
       return;
     }
 
-    // Handle erase mode - show red outline with background
     if (this.currentTool === 'erase') {
       const worldX = this.previewTilePos.x * window.mapData.tilewidth;
       const worldY = this.previewTilePos.y * window.mapData.tileheight;
 
-      // Draw red background
       ctx.fillStyle = 'rgba(231, 76, 60, 0.3)';
       ctx.fillRect(
         worldX,
@@ -1505,7 +1382,6 @@ class TileEditor {
         window.mapData.tileheight
       );
 
-      // Draw red outline
       ctx.strokeStyle = 'rgba(255, 89, 71, 1.0)';
       ctx.lineWidth = 3;
       ctx.strokeRect(
@@ -1519,7 +1395,6 @@ class TileEditor {
       return;
     }
 
-    // Handle single tile preview
     let tileToPreview: number | null = null;
     if (this.currentTool === 'paint' && this.selectedTile) {
       tileToPreview = this.selectedTile;
@@ -1527,13 +1402,11 @@ class TileEditor {
       tileToPreview = this.copiedTile;
     }
 
-    // Show white outline when paint mode with no tile or paste mode with empty tile (ID 0)
     if ((this.currentTool === 'paint' && !this.selectedTile) ||
         (this.currentTool === 'paste' && this.copiedTile === 0)) {
       const worldX = this.previewTilePos.x * window.mapData.tilewidth;
       const worldY = this.previewTilePos.y * window.mapData.tileheight;
 
-      // Draw white background
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.fillRect(
         worldX,
@@ -1542,7 +1415,6 @@ class TileEditor {
         window.mapData.tileheight
       );
 
-      // Draw white outline
       ctx.strokeStyle = 'rgba(255, 255, 255, 1.0)';
       ctx.lineWidth = 3;
       ctx.strokeRect(
@@ -1556,7 +1428,6 @@ class TileEditor {
       return;
     }
 
-    // Don't show preview for tile ID 0 (empty tile) unless already handled above
     if (tileToPreview === null || tileToPreview === 0) {
       ctx.restore();
       return;
@@ -1594,17 +1465,15 @@ class TileEditor {
         window.mapData.tilewidth, window.mapData.tileheight
       );
     } catch (e) {
-      console.error('Error drawing preview:', e);
+      console.error('Error drawing preview tile:', e);
     }
 
     ctx.restore();
   }
 }
 
-// Create singleton instance
 const tileEditor = new TileEditor();
 
-// Expose to window for renderer access
 (window as any).tileEditor = tileEditor;
 
 export default tileEditor;

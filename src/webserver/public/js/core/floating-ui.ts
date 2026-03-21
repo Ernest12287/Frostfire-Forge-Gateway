@@ -24,15 +24,13 @@ class FloatingUIManager {
       }
     });
 
-    // Add reset button to debug menu
     this.addResetButton();
   }
 
   private convertToFloatingPanel(element: HTMLElement, config: PanelConfig) {
-    // Add floating panel class
+
     element.classList.add('floating-panel');
 
-    // Create header
     const header = document.createElement('div');
     header.className = 'floating-panel-header ui';
 
@@ -42,7 +40,6 @@ class FloatingUIManager {
 
     header.appendChild(title);
 
-    // Add close button if closeable
     if (config.closeable) {
       const closeBtn = document.createElement('div');
       closeBtn.className = 'floating-panel-close ui';
@@ -53,23 +50,18 @@ class FloatingUIManager {
       header.appendChild(closeBtn);
     }
 
-    // Wrap existing content
     const content = document.createElement('div');
     content.className = 'floating-panel-content ui';
 
-    // Move all children to content div
     while (element.firstChild) {
       content.appendChild(element.firstChild);
     }
 
-    // Add header and content to element
     element.appendChild(header);
     element.appendChild(content);
 
-    // Register with draggable system
     draggableUI.registerPanel(config.id, element, header);
 
-    // Make sure panel is visible
     element.style.display = 'block';
   }
 
@@ -90,6 +82,5 @@ class FloatingUIManager {
   }
 }
 
-// Export singleton
 const floatingUIManager = new FloatingUIManager();
 export default floatingUIManager;

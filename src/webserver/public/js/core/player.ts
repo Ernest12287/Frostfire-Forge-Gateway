@@ -11,16 +11,32 @@ import { initializeLayeredAnimation } from "./layeredAnimation.js";
 import { getVisibleLayersSorted } from "./layeredAnimation.js";
 
 async function createPlayer(data: any) {
+
   if (data.id === cachedPlayerId) {
     positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
   }
 
   updateFriendOnlineStatus(data.username, true);
 
-  // Initialize sprite sheet layered animation system
   let layeredAnimationPromise = null;
 
-  if (data.bodySprite && data.headSprite) {
+  if (data.spriteData && (data.spriteData.bodySprite || data.spriteData.headSprite)) {
+    layeredAnimationPromise = initializeLayeredAnimation(
+      null,
+      data.spriteData.bodySprite || null,
+      data.spriteData.headSprite || null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      data.spriteData.animationState || 'idle'
+    );
+  } else if (data.bodySprite && data.headSprite) {
+
     layeredAnimationPromise = initializeLayeredAnimation(
       data.mountSprite || null,
       data.bodySprite,
@@ -35,6 +51,10 @@ async function createPlayer(data: any) {
       data.armorWeaponSprite || null,
       data.animationState || 'idle'
     );
+  }
+
+  if (!cache.pendingPlayers) {
+    cache.pendingPlayers = new Map();
   }
 
   const player = {
@@ -79,20 +99,17 @@ async function createPlayer(data: any) {
     castingInterrupted: false,
     castingInterruptedProgress: undefined as number | undefined,
     showChat: function (context: CanvasRenderingContext2D) {
-      // Draw typing indicator first (below in z-order)
+
       if (this.typing && this.typingImage) {
-        // Show typing image at top left, using image's natural dimensions
-        // Update opacity to 0.5 if the player is in stealth mode
+
         if (this.isStealth) {
           context.globalAlpha = 0.8;
         }
 
-        // Add a shadow to the typing image
         context.shadowColor = "black";
         context.shadowBlur = 2;
         context.shadowOffsetX = 0;
         context.shadowOffsetY = 0;
-        // Shrink the image in half
 
         context.drawImage(
           this.typingImage,
@@ -102,16 +119,14 @@ async function createPlayer(data: any) {
           this.typingImage.height / 1.5
         );
 
-        // Reset opacity
         context.globalAlpha = 1;
         context.shadowColor = "transparent";
         context.shadowBlur = 0;
       }
 
-      // Draw chat bubbles on top
       if (this.chat) {
         if (this.chat.trim() !== "") {
-          // Determine chat color based on chat type
+
           let chatColor = "white";
           if (this.chatType === "party") {
             chatColor = "#86b3ff";
@@ -144,7 +159,6 @@ async function createPlayer(data: any) {
         }
       }
 
-      // Reset shadow settings
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
       context.shadowOffsetX = 0;
@@ -152,26 +166,21 @@ async function createPlayer(data: any) {
     },
     showDamageNumbers: function (context: CanvasRenderingContext2D) {
       const now = performance.now();
-      const duration = 1000; // 1 second as requested
+      const duration = 1000;
 
-      // Filter out expired damage numbers
       this.damageNumbers = this.damageNumbers.filter(
         (dmg) => now - dmg.startTime < duration
       );
 
-      // Render each damage number
       for (const dmg of this.damageNumbers) {
         const elapsed = now - dmg.startTime;
         const progress = elapsed / duration;
 
-        // Calculate position (float up)
-        const yOffset = progress * 40; // Float up 40 pixels over 1 second
+        const yOffset = progress * 40;
         const displayY = dmg.y - yOffset;
 
-        // Calculate opacity (fade out)
         const opacity = 1 - progress;
 
-        // Set text style - bigger for crits
         if (dmg.isCrit && !dmg.isHealing) {
           context.font = "bold 28px 'Comic Relief'";
         } else {
@@ -179,16 +188,15 @@ async function createPlayer(data: any) {
         }
         context.textAlign = "center";
 
-        // Set color based on damage or healing
         if (dmg.isMiss) {
-          // White for misses
+
           context.fillStyle = `rgba(255, 255, 255, ${opacity})`;
           context.strokeStyle = `rgba(100, 100, 100, ${opacity})`;
         } else if (dmg.isHealing) {
           context.fillStyle = `rgba(0, 255, 0, ${opacity})`;
           context.strokeStyle = `rgba(0, 100, 0, ${opacity})`;
         } else if (dmg.isCrit) {
-          // Bright yellow/orange for crits
+
           context.fillStyle = `rgba(255, 215, 0, ${opacity})`;
           context.strokeStyle = `rgba(255, 140, 0, ${opacity})`;
         } else {
@@ -196,7 +204,6 @@ async function createPlayer(data: any) {
           context.strokeStyle = `rgba(139, 0, 0, ${opacity})`;
         }
 
-        // Draw text with outline - show "Miss" for misses, add ! for crits
         const displayText = dmg.isMiss
           ? "Miss"
           : dmg.isCrit && !dmg.isHealing
@@ -216,7 +223,6 @@ async function createPlayer(data: any) {
         );
       }
 
-      // Reset context
       context.fillStyle = "white";
       context.strokeStyle = "black";
       context.lineWidth = 1;
@@ -227,101 +233,87 @@ async function createPlayer(data: any) {
       const now = performance.now();
       const elapsed = now - this.castingStartTime;
 
-      // If interrupted/failed, freeze progress at the point of interruption
       let progress;
       if (this.castingInterrupted) {
         if (this.castingSpell === "Failed") {
-          // Failed always shows at 100%
+
           progress = 1.0;
         } else {
-          // Interrupted shows at current progress with minimum 15% visibility
+
           progress = Math.max(this.castingInterruptedProgress || 0, 0.15);
         }
       } else {
         progress = Math.min(elapsed / this.castingDuration, 1);
       }
 
-      // Castbar dimensions - larger and more professional
       const barWidth = 120;
       const barHeight = 12;
       const barX = this.position.x - barWidth / 2;
-      const barY = this.position.y - 45; // Above the player
+      const barY = this.position.y - 45;
 
-      // Outer shadow for depth
       context.shadowColor = "rgba(0, 0, 0, 0.7)";
       context.shadowBlur = 8;
       context.shadowOffsetY = 3;
 
-      // Background with border
       context.fillStyle = "rgba(15, 15, 25, 0.95)";
       context.fillRect(barX, barY, barWidth, barHeight);
 
-      // Reset shadow for border
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
       context.shadowOffsetY = 0;
 
-      // Inner background (darker inset)
       context.fillStyle = "rgba(10, 10, 15, 0.8)";
       context.fillRect(barX + 1, barY + 1, barWidth - 2, barHeight - 2);
 
-      // Progress bar with gradients
       if (this.castingInterrupted) {
         if (this.castingSpell === "Failed") {
-          // Red gradient for failed
+
           const gradient = context.createLinearGradient(barX, barY, barX, barY + barHeight);
           gradient.addColorStop(0, "#ef4444");
           gradient.addColorStop(0.5, "#dc2626");
           gradient.addColorStop(1, "#b91c1c");
           context.fillStyle = gradient;
 
-          // Failed glow
           context.shadowColor = "rgba(239, 68, 68, 0.8)";
           context.shadowBlur = 10;
         } else {
-          // Grey gradient for interrupted
+
           const gradient = context.createLinearGradient(barX, barY, barX, barY + barHeight);
           gradient.addColorStop(0, "#9ca3af");
           gradient.addColorStop(0.5, "#6b7280");
           gradient.addColorStop(1, "#4b5563");
           context.fillStyle = gradient;
 
-          // Subtle interrupted glow
           context.shadowColor = "rgba(107, 114, 128, 0.5)";
           context.shadowBlur = 6;
         }
       } else {
-        // Purple gradient for casting
+
         const gradient = context.createLinearGradient(barX, barY, barX, barY + barHeight);
         gradient.addColorStop(0, "#a78bfa");
         gradient.addColorStop(0.5, "#8b5cf6");
         gradient.addColorStop(1, "#7c3aed");
         context.fillStyle = gradient;
 
-        // Casting glow
         context.shadowColor = "rgba(139, 92, 246, 0.7)";
         context.shadowBlur = 12;
       }
 
       context.fillRect(barX + 2, barY + 2, (barWidth - 4) * progress, barHeight - 4);
 
-      // Reset shadow
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
 
-      // Highlight overlay (top shine)
       const highlightGradient = context.createLinearGradient(barX, barY, barX, barY + barHeight / 2);
       highlightGradient.addColorStop(0, "rgba(255, 255, 255, 0.25)");
       highlightGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
       context.fillStyle = highlightGradient;
       context.fillRect(barX + 2, barY + 2, (barWidth - 4) * progress, (barHeight - 4) / 2);
 
-      // Border
       context.strokeStyle = "rgba(255, 255, 255, 0.15)";
       context.lineWidth = 1.5;
       context.strokeRect(barX + 0.5, barY + 0.5, barWidth - 1, barHeight - 1);
 
-      // Spell name
       context.font = "bold 11px 'Comic Relief'";
       context.fillStyle = "white";
       context.textAlign = "center";
@@ -331,12 +323,10 @@ async function createPlayer(data: any) {
       const spellText = this.castingInterrupted ? this.castingSpell : this.castingSpell;
       context.fillText(spellText, this.position.x, barY - 5);
 
-      // Reset all shadow settings
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
       context.shadowOffsetY = 0;
 
-      // Auto-remove after cast completes or interrupt finishes
       if (this.castingInterrupted && elapsed >= 1500) {
         this.castingSpell = null;
         this.castingInterrupted = false;
@@ -346,7 +336,7 @@ async function createPlayer(data: any) {
       }
     },
     renderAnimation: function (context: CanvasRenderingContext2D) {
-      // Use sprite sheet layered animation system only
+
       if (!this.layeredAnimation) {
         return;
       }
@@ -359,31 +349,24 @@ async function createPlayer(data: any) {
       const layers = getVisibleLayersSorted(this.layeredAnimation);
       if (layers.length === 0) return;
 
-      // Create offscreen canvases for each layer if needed
       if (!this._layerCanvases) {
         this._layerCanvases = {};
       }
 
-      // Save context state
       context.save();
 
-      // Enable pixel-perfect rendering
       context.imageSmoothingEnabled = false;
 
-      // Apply stealth opacity if needed
       if (this.isStealth) {
         context.globalAlpha = 0.5;
       }
 
-      // Render each layer separately
       for (const layer of layers) {
         if (layer.frames.length === 0) continue;
 
         const frame = layer.frames[layer.currentFrame];
         if (!frame || !frame.imageElement?.complete) continue;
 
-        // Create unique canvas for this layer if it doesn't exist
-        // Include animation name and mount status to prevent cache collisions
         const isMounted: boolean = this.layeredAnimation.layers.mount !== null;
         const layerKey = `${layer.type}_${this.layeredAnimation.currentAnimationName}_${layer.currentFrame}_${isMounted}`;
         if (!this._layerCanvases[layerKey]) {
@@ -393,7 +376,7 @@ async function createPlayer(data: any) {
           const layerCtx = layerCanvas.getContext('2d');
 
           if (layerCtx) {
-            // Disable image smoothing on layer canvas too
+
             layerCtx.imageSmoothingEnabled = false;
             layerCtx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
             layerCtx.drawImage(frame.imageElement, 0, 0);
@@ -406,7 +389,6 @@ async function createPlayer(data: any) {
         const offsetX = frame.offset?.x || 0;
         const offsetY = frame.offset?.y || 0;
 
-        // Draw directly to main canvas with pixel-perfect positioning
         context.drawImage(
           layerCanvas,
           Math.round(this.position.x - frame.width / 2 + offsetX),
@@ -414,14 +396,13 @@ async function createPlayer(data: any) {
         );
       }
 
-      // Restore context state
       context.restore();
     },
     show: function (context: CanvasRenderingContext2D, currentPlayer?: any) {
-      // UI offset for all players
+
       const uiOffset = 10;
 
-      let shadow: { width: number; height: number; fillStyle: string; borderColor: string } = { width: 0, height: 0, fillStyle: "black", borderColor: "black" };
+      let shadow: { width: number; height: number; fillStyle: string; borderColor: string };
       if (this.targeted) {
         shadow = {
           width: 18,
@@ -438,7 +419,6 @@ async function createPlayer(data: any) {
         };
       }
 
-      // Outer ring (darker)
       context.save();
       context.beginPath();
       context.ellipse(
@@ -454,7 +434,6 @@ async function createPlayer(data: any) {
       context.lineWidth = 1;
       context.stroke();
 
-      // Inner fill (lighter)
       context.beginPath();
       context.ellipse(
         this.position.x,
@@ -472,29 +451,24 @@ async function createPlayer(data: any) {
 
       context.globalAlpha = 1;
       context.font = "14px 'Comic Relief'";
-      
-      // Opacity for stealth mode
+
       if (this.isStealth) {
         context.fillStyle = "rgba(97, 168, 255, 1)";
       } else {
         context.fillStyle = "white";
       }
 
-      // Draw the player's username
       context.textAlign = "center";
 
       if (!currentPlayer) return;
-      
-      // Determine color for player name
+
       let nameColor: string | undefined;
 
       const isCurrent = data.id === currentPlayer?.id;
       const isVisible = !this.isStealth;
 
-      // Admin color animation (only when visible)
       if (this.isAdmin && isVisible) {
-        // this._adminColorHue = (this._adminColorHue + 2) % 360;
-        // nameColor = `hsl(${this._adminColorHue}, 100%, 50%)`;
+
         nameColor = "#ff2252ff";
       }
 
@@ -514,7 +488,6 @@ async function createPlayer(data: any) {
 
       context.fillStyle = nameColor;
 
-
       context.shadowColor = "black";
       context.shadowBlur = 2;
       context.shadowOffsetX = 0;
@@ -526,12 +499,11 @@ async function createPlayer(data: any) {
       } else {
         const u = data?.username;
         if (!u) {
-          // Clear cookies and session storage, then reload the page because we have no username due to an error
-          // Clear all cookies
+
           document.cookie.split(";").forEach(function(c) {
             document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
           });
-          // Clear session storage
+
           sessionStorage.clear();
 
           window.location.href = "/";
@@ -551,26 +523,23 @@ async function createPlayer(data: any) {
         this.position.y + 40 + uiOffset
       );
 
-      // Draw the player's health bar below the player's name with a width of 100px, centered below the player name
       if (!this.isStealth) {
         if (data.id === cachedPlayerId || this.targeted) {
           context.fillStyle = "rgba(0, 0, 0, 0.8)";
           context.fillRect(this.position.x - 50, this.position.y + 46 + uiOffset, 100, 3);
 
-          // Update the shadowblur to 2
           context.shadowBlur = 2;
 
-          // Set health bar color based on health percentage
           const maxHealth = this.stats.total_max_health || this.stats.max_health;
           const healthPercent = this.stats.health / maxHealth;
           if (healthPercent < 0.3) {
-            context.fillStyle = "#C81D1D"; // red
+            context.fillStyle = "#C81D1D";
           } else if (healthPercent < 0.5) {
-            context.fillStyle = "#C87C1D"; // orange
+            context.fillStyle = "#C87C1D";
           } else if (healthPercent < 0.8) {
-            context.fillStyle = "#C8C520"; // yellow
+            context.fillStyle = "#C8C520";
           } else {
-            context.fillStyle = "#519D41"; // green
+            context.fillStyle = "#519D41";
           }
 
           context.fillRect(
@@ -581,8 +550,6 @@ async function createPlayer(data: any) {
           );
         }
 
-        // Draw the player's stamina bar below the player's health bar with a width of 75px, centered below the player's health bar
-        // Check if current player is the same as the player we are drawing
         if (data.id === cachedPlayerId || this.targeted) {
         context.fillStyle = "rgba(0, 0, 0, 0.8)";
         context.fillRect(this.position.x - 50, this.position.y + 51 + uiOffset, 100, 3);
@@ -597,11 +564,11 @@ async function createPlayer(data: any) {
         }
 
         if (data.id === cachedPlayerId || this.targeted) {
-          // Draw the player's level on the left side of the health bar
+
           context.textAlign = "left";
           context.font = "12px 'Comic Relief'";
           context.fillStyle = "white";
-          // Text shadow for better visibility
+
           context.shadowColor = "black";
           context.shadowBlur = 2;
             const offsetX = this.position.x - 60 - (this.stats.level.toString().length * 5);
@@ -609,7 +576,6 @@ async function createPlayer(data: any) {
         }
       }
 
-      // Reset shadow settings
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
 
@@ -617,22 +583,31 @@ async function createPlayer(data: any) {
     },
   };
 
-  // Load sprite sheet layered animation system FIRST
+  if (!cache.pendingPlayers) {
+    cache.pendingPlayers = new Map();
+  }
+  cache.pendingPlayers.set(player.id, player);
+
   if (layeredAnimationPromise) {
     player.layeredAnimation = await layeredAnimationPromise;
-    // Only add to cache if animation loaded (player will be visible)
+
     cache.players.add(player);
 
-    // If this is the self-player, mark sprite as loaded
+    if (cache.pendingPlayers) {
+      cache.pendingPlayers.delete(player.id);
+    }
+
     if (data.id === cachedPlayerId) {
       setSelfPlayerSpriteLoaded(true);
     }
   } else {
-    // No sprite data yet - store in pending list, wait for SPRITE_SHEET_ANIMATION packet
-    if (!cache.pendingPlayers) {
-      cache.pendingPlayers = new Map();
+
+
+    cache.players.add(player);
+
+    if (cache.pendingPlayers) {
+      cache.pendingPlayers.delete(player.id);
     }
-    cache.pendingPlayers.set(player.id, player);
   }
 
   if (data.id === cachedPlayerId) {
@@ -644,6 +619,5 @@ async function createPlayer(data: any) {
     updateXp(data.stats.xp, data.stats.level, data.stats.max_xp);
   }
 }
-
 
 export { createPlayer };

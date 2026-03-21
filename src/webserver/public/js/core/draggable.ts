@@ -1,4 +1,4 @@
-// Draggable Panel System
+
 interface PanelPosition {
   x: number;
   y: number;
@@ -26,7 +26,6 @@ class DraggableUI {
   public registerPanel(id: string, element: HTMLElement, handle: HTMLElement) {
     const savedPosition = this.getSavedPosition(id);
 
-    // Set initial position
     if (savedPosition) {
       element.style.left = `${savedPosition.x}px`;
       element.style.top = `${savedPosition.y}px`;
@@ -45,7 +44,6 @@ class DraggableUI {
 
     this.panels.set(id, panel);
 
-    // Setup drag events
     handle.style.cursor = 'grab';
     handle.addEventListener('mousedown', (e) => this.onDragStart(id, e));
     document.addEventListener('mousemove', (e) => this.onDrag(id, e));
@@ -65,7 +63,7 @@ class DraggableUI {
     panel.offsetY = rect.top;
 
     panel.handle.style.cursor = 'grabbing';
-    panel.element.style.zIndex = '1000'; // Bring to front
+    panel.element.style.zIndex = '1000';
   }
 
   private onDrag(id: string, e: MouseEvent) {
@@ -78,7 +76,6 @@ class DraggableUI {
     let newX = panel.offsetX + deltaX;
     let newY = panel.offsetY + deltaY;
 
-    // Constrain to viewport
     const rect = panel.element.getBoundingClientRect();
     const maxX = window.innerWidth - rect.width;
     const maxY = window.innerHeight - rect.height;
@@ -101,7 +98,6 @@ class DraggableUI {
     panel.handle.style.cursor = 'grab';
     panel.element.style.zIndex = '100';
 
-    // Save position
     this.savePosition(id, panel.position);
   }
 
@@ -112,7 +108,7 @@ class DraggableUI {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.warn('Failed to load UI positions:', e);
+      console.error('Error loading panel positions:', e);
     }
     return {};
   }
@@ -128,7 +124,7 @@ class DraggableUI {
       positions[id] = position;
       localStorage.setItem(this.storageKey, JSON.stringify(positions));
     } catch (e) {
-      console.warn('Failed to save UI position:', e);
+      console.error('Error saving panel position:', e);
     }
   }
 
@@ -138,6 +134,5 @@ class DraggableUI {
   }
 }
 
-// Export singleton instance
 const draggableUI = new DraggableUI();
 export default draggableUI;

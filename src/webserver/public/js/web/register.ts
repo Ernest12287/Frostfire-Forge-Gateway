@@ -33,7 +33,6 @@ register.addEventListener('click', async () => {
   }
 });
 
-// Listen for the enter key to click the register button
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     register.click();

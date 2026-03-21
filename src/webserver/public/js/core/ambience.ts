@@ -46,18 +46,17 @@ function updateAmbience() {
     return `rgb(${r},${g},${b})`;
   }
 
-  // Realistic Sun Phases
   const phases = [
-    { hour: 0,   color: "#0b0033", opacity: 0.6 },   // midnight
-    { hour: 4,   color: "#0b1a40", opacity: 0.55 },  // deep night (pre-dawn blue)
-    { hour: 5,   color: "#2a1a5e", opacity: 0.45 },  // early dawn purple
-    { hour: 6,   color: "#ff9966", opacity: 0.3 },   // sunrise orange/yellow
-    { hour: 7,   color: "#add8e6", opacity: 0.1 },   // morning sky blue
-    { hour: 12,  color: "#87ceeb", opacity: 0.05 },  // midday bright sky
-    { hour: 18,  color: "#87ceeb", opacity: 0.05 },  // late afternoon (still bright)
-    { hour: 19,  color: "#ff6347", opacity: 0.25 },  // sunset warm orange
-    { hour: 20,  color: "#191970", opacity: 0.5 },   // dusk deep blue
-    { hour: 24,  color: "#0b0033", opacity: 0.6 }    // midnight wrap
+    { hour: 0,   color: "#0b0033", opacity: 0.6 },
+    { hour: 4,   color: "#0b1a40", opacity: 0.55 },
+    { hour: 5,   color: "#2a1a5e", opacity: 0.45 },
+    { hour: 6,   color: "#ff9966", opacity: 0.3 },
+    { hour: 7,   color: "#add8e6", opacity: 0.1 },
+    { hour: 12,  color: "#87ceeb", opacity: 0.05 },
+    { hour: 18,  color: "#87ceeb", opacity: 0.05 },
+    { hour: 19,  color: "#ff6347", opacity: 0.25 },
+    { hour: 20,  color: "#191970", opacity: 0.5 },
+    { hour: 24,  color: "#0b0033", opacity: 0.6 }
   ];
 
   let phase1, phase2;

@@ -5,7 +5,6 @@ import encryptRsa from "./crypto.js";
 import { chatInput } from "./ui.js";
 const isCryptoSupported = typeof window?.crypto?.subtle === "object" && Object.keys(window.crypto.subtle).length !== 0;
 
-// TODO: Add functionality to "set" chat mode when e.g.: /p (press space after)
 async function handleChatMessage(message: string) {
   if (isCryptoSupported) {
     const chatDecryptionKey = sessionStorage.getItem("chatDecryptionKey");
@@ -22,7 +21,6 @@ async function handleChatMessage(message: string) {
     });
   }
 
-  // Set timeout to clear chat
   setTimeout(() => {
     const currentPlayer = Array.from(cache.players).find(player => player.id === cachedPlayerId);
     if (currentPlayer?.chat === message) {

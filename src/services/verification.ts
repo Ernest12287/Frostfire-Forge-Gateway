@@ -11,7 +11,7 @@ function verify(token: string, useremail: string, username: string): Promise<voi
                 }
                 useremail = useremail.toLowerCase();
                 username = username.toLowerCase();
-                // Generate a random 2FA code
+
                 const gameName = process.env.GAME_NAME || process.env.DOMAIN || "Game";
                 const subject = `Verify your account`;
                 const code = shuffle(token, 100);

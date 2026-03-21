@@ -1,7 +1,6 @@
 import log from "../modules/logger";
 import nodemailer from "nodemailer";
 
-// Email setup
 const transporter = nodemailer.createTransport({
   pool: true,
   host: process.env.EMAIL_SERVICE,
@@ -28,7 +27,6 @@ export default function sendEmail(email: string, subject: string, header: string
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       log.error("Invalid email format");
@@ -36,7 +34,6 @@ export default function sendEmail(email: string, subject: string, header: string
       return;
     }
 
-    // Validate subject and message length
     if (subject.length > 78) {
       log.error("Subject exceeds maximum length of 78 characters");
       resolve("Subject exceeds maximum length of 78 characters");
@@ -56,7 +53,7 @@ export default function sendEmail(email: string, subject: string, header: string
         subject: `${header} - ${subject}`,
         html: createHTML(subject, message),
       };
-      
+
       transporter.sendMail(mailOptions, function (error: any) {
         if (error) {
           log.error(error as string);
@@ -64,7 +61,7 @@ export default function sendEmail(email: string, subject: string, header: string
         } else {
           log.info(`📧  Email Sent 📧
 To: ${censorEmail(email)}
-Subject: ${subject} 
+Subject: ${subject}
 Content Length: ${message.length}`);
           resolve("Email sent successfully");
         }
@@ -78,15 +75,15 @@ Content Length: ${message.length}`);
 
 const censorEmail = (email: string) => {
   const [local, domain] = email.split('@');
-  
+
   const censoredLocal = local.length > 2
     ? `${local.slice(0, 2)}${'*'.repeat(local.length - 2)}`
     : '*'.repeat(local.length);
-  
+
   const [domainName, domainExtension] = domain.split('.');
-  
+
   const censoredDomain = `${domainName[0]}${'*'.repeat(domainName.length - 1)}.${domainExtension}`;
-  
+
   return `${censoredLocal}@${censoredDomain}`;
 };
 

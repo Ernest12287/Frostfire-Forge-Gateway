@@ -3,7 +3,6 @@ const emailInput = document.getElementById("forgotpassword-email") as HTMLInputE
 const currentURL = new URL(window.location.href);
 const email = currentURL.searchParams.get("email") as string;
 
-// If an email is provided in the URL, set it in the input field
 if (email) {
   emailInput.value = email;
 }
@@ -28,7 +27,6 @@ forgotPasswordButton.addEventListener("click", async () => {
   emailInput.value = "";
 });
 
-// Check for enter key press on the email input
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     forgotPasswordButton.click();

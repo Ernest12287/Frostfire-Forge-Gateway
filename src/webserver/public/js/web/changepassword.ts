@@ -8,11 +8,11 @@ const code = currentURL.searchParams.get("code") as string;
 const email = currentURL.searchParams.get("email") as string;
 if (!code || !email) {
     window.Notify("error", "Invalid or missing code or email");
-    window.location.href = "/"; // Redirect to login if code or email is missing
+    window.location.href = "/";
 }
 
 emailInput.value = email;
-emailInput.disabled = true; // Disable email input since it's pre-filled from the URL
+emailInput.disabled = true;
 
 changePasswordButton.addEventListener("click", async () => {
   if (!code) {
@@ -40,7 +40,7 @@ changePasswordButton.addEventListener("click", async () => {
 
   if (response.ok) {
     window.Notify("success", "Password changed successfully. Redirecting to login...");
-    // Redirect to login page after a short delay
+
     setTimeout(() => {
       window.location.href = "/";
     }, 3000);
@@ -51,7 +51,6 @@ changePasswordButton.addEventListener("click", async () => {
   }
 });
 
-// Check for enter key press on the password input
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     changePasswordButton.click();

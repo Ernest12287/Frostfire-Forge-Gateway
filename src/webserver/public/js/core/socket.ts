@@ -58,7 +58,6 @@ import parseAPNG from "../libs/apng_parser.js";
 import { getCookie } from "./cookies.ts";
 import { createCachedImage } from "./images.ts";
 
-// Socket will be initialized after gateway check
 let socket: WebSocket;
 
 let sentRequests: number = 0,
@@ -71,17 +70,17 @@ function sendRequest(data: any) {
   socket.send(packet.encode(JSON.stringify(data)));
 }
 
-// Pending asset requests via WebSocket
 const pendingMapChunkRequests = new Map<string, {resolve: (data: any) => void, reject: (error: Error) => void}>();
 const pendingTilesetRequests = new Map<string, {resolve: (data: any) => void, reject: (error: Error) => void}>();
 
-// Tileset streaming state
 const tilesetChunks = new Map<string, {chunks: string[], totalChunks: number, received: number}>();
 
-// Request map chunk via WebSocket
+let loadPlayersProcessing = false;
+const loadPlayersQueue: any[] = [];
+
 export function requestMapChunkViaWS(mapName: string, chunkX: number, chunkY: number, chunkSize: number): Promise<any> {
   return new Promise((resolve, reject) => {
-    // Check if socket is ready
+
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       reject(new Error("WebSocket not connected"));
       return;
@@ -95,7 +94,6 @@ export function requestMapChunkViaWS(mapName: string, chunkX: number, chunkY: nu
       data: { map: mapName, x: chunkX, y: chunkY, size: chunkSize }
     });
 
-    // Timeout after 10 seconds
     setTimeout(() => {
       if (pendingMapChunkRequests.has(chunkKey)) {
         pendingMapChunkRequests.delete(chunkKey);
@@ -105,10 +103,9 @@ export function requestMapChunkViaWS(mapName: string, chunkX: number, chunkY: nu
   });
 }
 
-// Request tileset via WebSocket
 export function requestTilesetViaWS(tilesetName: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    // Check if socket is ready
+
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       reject(new Error("WebSocket not connected"));
       return;
@@ -121,7 +118,6 @@ export function requestTilesetViaWS(tilesetName: string): Promise<any> {
       data: { name: tilesetName }
     });
 
-    // Timeout after 1 minute
     setTimeout(() => {
       if (pendingTilesetRequests.has(tilesetName)) {
         pendingTilesetRequests.delete(tilesetName);
@@ -139,8 +135,6 @@ let snapshotApplied: boolean = false;
 let animationUpdateBuffer: Array<{id: string, name: string, data: any, revision: number}> = [];
 let pendingMovements: Array<{id: string, _data: any, revision: number}> = [];
 
-// Set up equipment slots drag and drop handlers
-// This needs to be called after cloning equipment slots to re-attach handlers
 const setupEquipmentSlotHandlers = () => {
   const allEquipmentSlots = [
     ...equipmentLeftColumn.querySelectorAll(".slot"),
@@ -151,15 +145,13 @@ const setupEquipmentSlotHandlers = () => {
   allEquipmentSlots.forEach((slot) => {
     const slotType = slot.getAttribute("data-slot");
 
-    // Add drag-and-drop handlers to equipment slots
-    // Prevent default drag over behavior
     slot.addEventListener("dragover", (event: Event) => {
       const dragEvent = event as DragEvent;
       dragEvent.preventDefault();
       if (dragEvent.dataTransfer) {
-        // Check if this is an inventory item being dragged (not equipment slot rearranging)
+
         if (dragEvent.dataTransfer.types.includes("equipment-slot")) {
-          // Can't validate slot match until drop, so show white border
+
           dragEvent.dataTransfer.dropEffect = "move";
           (slot as HTMLElement).style.border = "2px solid white";
         } else {
@@ -168,12 +160,10 @@ const setupEquipmentSlotHandlers = () => {
       }
     });
 
-    // Remove border when drag leaves
     slot.addEventListener("dragleave", () => {
       (slot as HTMLElement).style.border = "";
     });
 
-    // Handle drop
     slot.addEventListener("drop", (event: Event) => {
       const dragEvent = event as DragEvent;
       dragEvent.preventDefault();
@@ -184,7 +174,6 @@ const setupEquipmentSlotHandlers = () => {
         const itemSlot = dragEvent.dataTransfer.getData("equipment-slot");
         const slotIndex = dragEvent.dataTransfer.getData("inventory-rearrange-index");
 
-        // Only equip if the item's equipment slot matches this slot
         if (itemName && itemSlot === slotType) {
           sendRequest({
             type: "EQUIP_ITEM",
@@ -196,11 +185,8 @@ const setupEquipmentSlotHandlers = () => {
   });
 };
 
-/**
- * Connect through gateway to a selected or assigned game server
- */
-async function connectThroughGateway(gatewayUrl: string): Promise<WebSocket> {
-  // First, get a connection token from the gateway
+async function connectThroughGateway(): Promise<WebSocket | undefined> {
+
   let connectionToken;
   try {
     const tokenResponse = await fetch('/api/gateway/connection-token');
@@ -208,19 +194,16 @@ async function connectThroughGateway(gatewayUrl: string): Promise<WebSocket> {
       throw new Error('Failed to obtain connection token from gateway');
     }
     connectionToken = await tokenResponse.json();
-    console.log('[Gateway] Obtained connection token');
   } catch (error) {
-    throw new Error(`Failed to obtain connection token: ${error}`);
+    console.error("Error obtaining connection token:", error);
   }
 
-  // Check if user selected a specific server
   const selectedServerId = localStorage.getItem('selectedServerId');
 
   if (selectedServerId) {
-    console.log(`[Gateway] User selected server: ${selectedServerId}`);
 
     try {
-      // Fetch server details from webserver's gateway API endpoint
+
       const response = await fetch('/api/gateway/servers');
       if (!response.ok) {
         throw new Error('Failed to fetch server list');
@@ -230,26 +213,21 @@ async function connectThroughGateway(gatewayUrl: string): Promise<WebSocket> {
       const server = data.servers.find((s: any) => s.id === selectedServerId);
 
       if (server) {
-        // Connect directly to the selected server with token
-        // Use wss:// if server has SSL enabled, otherwise use ws://
+
         const wsProtocol = server.useSSL ? 'wss://' : 'ws://';
         const gameServerWsUrl = `${server.publicHost.startsWith('ws') ? '' : wsProtocol}${server.publicHost}:${server.wsPort}?token=${connectionToken.token}&timestamp=${connectionToken.timestamp}&expiresAt=${connectionToken.expiresAt}&signature=${connectionToken.signature}`;
-        console.log(`[Gateway] Connecting to selected server with auth token: ${server.publicHost}:${server.wsPort} (${wsProtocol.replace('://', '')})`);
 
         const gameServerWs = new WebSocket(gameServerWsUrl);
         return gameServerWs;
       } else {
-        console.warn(`[Gateway] Selected server ${selectedServerId} not found, falling back to gateway assignment`);
-        // Clear invalid selection
+
         localStorage.removeItem('selectedServerId');
       }
     } catch (error) {
-      console.warn(`[Gateway] Failed to connect to selected server, falling back to gateway assignment:`, error);
       localStorage.removeItem('selectedServerId');
     }
   }
 
-  // Normal gateway assignment (round-robin) - fetch from webserver API
   try {
     const response = await fetch('/api/gateway/servers');
     if (!response.ok) {
@@ -262,41 +240,31 @@ async function connectThroughGateway(gatewayUrl: string): Promise<WebSocket> {
       throw new Error('No game servers available');
     }
 
-    // Filter for healthy servers only
     const healthyServers = data.servers.filter((s: any) => s.status === 'online' || s.status === 'healthy');
 
     if (healthyServers.length === 0) {
       throw new Error('No healthy game servers available');
     }
 
-    // Pick first healthy server (server-side can implement round-robin if needed)
     const server = healthyServers[0];
 
-    // Connect directly to the assigned game server with token
-    // Use wss:// if server has SSL enabled, otherwise use ws://
     const wsProtocol = server.useSSL ? 'wss://' : 'ws://';
     const gameServerWsUrl = `${server.publicHost.startsWith('ws') ? '' : wsProtocol}${server.publicHost}:${server.wsPort}?token=${connectionToken.token}&timestamp=${connectionToken.timestamp}&expiresAt=${connectionToken.expiresAt}&signature=${connectionToken.signature}`;
-    console.log(`[Gateway] Connecting to assigned server with auth token: ${server.publicHost}:${server.wsPort} (${wsProtocol.replace('://', '')})`);
 
     const gameServerWs = new WebSocket(gameServerWsUrl);
     return gameServerWs;
   } catch (error) {
-    throw new Error(`Gateway assignment failed: ${error}`);
+    console.error("Error connecting through gateway:", error);
   }
 }
 
-// Reconnection tracking
 let isReconnecting = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-/**
- * Initialize WebSocket connection (direct or via gateway)
- */
 async function initializeSocket() {
-  // Prevent multiple simultaneous reconnection attempts
+
   if (isReconnecting) {
-    console.log('[Socket] Already attempting to reconnect, skipping...');
     return;
   }
 
@@ -305,23 +273,25 @@ async function initializeSocket() {
   const gatewayUrl = config.GATEWAY_URL;
 
   if (!gatewayUrl) {
-    console.error('[Gateway] No gateway URL configured');
     isReconnecting = false;
     throw new Error('Gateway URL not configured');
   }
 
   try {
-    socket = await connectThroughGateway(gatewayUrl);
+    socket = (await connectThroughGateway()) as WebSocket;
   } catch (error) {
-    console.error('[Gateway] Gateway connection failed:', error);
     isReconnecting = false;
     throw error;
+  }
+
+  if (!socket) {
+    isReconnecting = false;
+    throw new Error('Failed to establish WebSocket connection');
   }
 
   socket.binaryType = "arraybuffer";
   setupSocketHandlers();
 
-  // Socket is already open from gateway - manually trigger initialization
   if (socket.readyState === WebSocket.OPEN) {
     initializeConnection();
   }
@@ -329,15 +299,12 @@ async function initializeSocket() {
   isReconnecting = false;
 }
 
-/**
- * Initialize connection (called when socket opens)
- */
 function initializeConnection() {
-  // Reset reconnection tracking on successful connection
+
   reconnectAttempts = 0;
 
   cache.players.clear();
-  // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
   sessionActive = false;
   cachedPlayerId = null;
@@ -353,26 +320,21 @@ function initializeConnection() {
   });
 }
 
-/**
- * Setup socket event handlers
- */
 function setupSocketHandlers() {
 socket.onopen = () => {
   initializeConnection();
 };
 
 socket.onclose = (ev: CloseEvent) => {
-  // Remove the loading bar if it exists
+
   progressBarContainer.style.display = "none";
 
-  // Check if this was an unexpected disconnect (not code 1000 = normal closure)
   const wasUnexpected = ev.code !== 1000 && ev.code !== 1001;
 
   if (wasUnexpected && config.GATEWAY_ENABLED === 'true') {
     reconnectAttempts++;
 
     if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-      console.error(`[Socket] Max reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached`);
       showNotification(
         `Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts. Please refresh the page.`,
         false,
@@ -381,26 +343,22 @@ socket.onclose = (ev: CloseEvent) => {
       return;
     }
 
-    console.log(`[Socket] Unexpected disconnect (${ev.code}), attempting reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
     showNotification(
       `Connection lost (${ev.code}). Reconnecting (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
       false,
       false
     );
 
-    // Attempt to reconnect after 2 seconds
     setTimeout(async () => {
       try {
         await initializeSocket();
-        console.log('[Socket] Reconnected successfully');
-        reconnectAttempts = 0; // Reset on successful connection
+        reconnectAttempts = 0;
         showNotification(
           `Reconnected successfully!`,
           true,
           false
         );
       } catch (error) {
-        console.error('[Socket] Reconnect failed:', error);
         showNotification(
           `Reconnection failed. Please refresh the page.`,
           false,
@@ -425,6 +383,142 @@ socket.onerror = (ev: Event) => {
     true
   );
 };
+
+async function handleLoadPlayersPacket(data: any) {
+
+  if (loadPlayersProcessing) {
+    loadPlayersQueue.push(data);
+    return;
+  }
+
+  loadPlayersProcessing = true;
+
+  try {
+
+    if (!sessionActive || !cachedPlayerId) {
+      return;
+    }
+
+    await isLoaded();
+    if (!data) {
+      return;
+    }
+
+    const players = data.players || data;
+    snapshotRevision = data.snapshotRevision ?? null;
+
+    const playerArray = Array.isArray(players) ? players : [];
+
+    for (const player of playerArray) {
+      if (player.id != cachedPlayerId) {
+
+        const existingByUsername = Array.from(cache.players).find(
+          (p) => p.username === player.username && p.userid === player.userid
+        );
+
+        const existingInPending = cache.pendingPlayers?.get(player.id);
+
+        if (!existingByUsername && !existingInPending) {
+          await createPlayer(player);
+        }
+      }
+    }
+
+    snapshotApplied = true;
+
+    if (pendingMovements.length > 0) {
+      for (const movement of pendingMovements) {
+        const player = Array.from(cache.players).find(
+          (p) => p.id === movement.id
+        );
+        if (player && movement._data) {
+          player.position.x = movement._data.x;
+          player.position.y = movement._data.y;
+          if (movement.id === cachedPlayerId) {
+            positionText.innerText = `Position: ${movement._data.x}, ${movement._data.y}`;
+          }
+        }
+      }
+      pendingMovements = [];
+    }
+
+    const bufferedAnimations = animationUpdateBuffer
+      .filter(update => snapshotRevision === null || update.revision > snapshotRevision)
+      .sort((a, b) => a.revision - b.revision);
+
+    for (const update of bufferedAnimations) {
+      const player = Array.from(cache.players).find(p => p.id === update.id);
+      if (player) {
+        try {
+          let apng: any;
+          const cachedData = cache.animations.get(update.name);
+
+          if (cachedData instanceof Uint8Array) {
+            apng = parseAPNG(cachedData);
+          } else {
+
+            const dbData = await getAnimationFromDB(update.name);
+            if (dbData) {
+              cache.animations.set(update.name, dbData);
+              apng = parseAPNG(dbData);
+            } else {
+
+              //@ts-expect-error - Imported via HTML
+              const inflated = pako.inflate(new Uint8Array(update.data.data));
+              if (inflated) {
+                cache.animations.set(update.name, inflated);
+                await saveAnimationToDB(update.name, inflated);
+                apng = parseAPNG(inflated);
+              }
+            }
+          }
+
+          if (!(apng instanceof Error)) {
+
+            if (apng.frames && apng.frames.length > 0) {
+              apng.frames.forEach((frame: any) => frame.createImage());
+              await Promise.all(
+                apng.frames.map((frame: any) => {
+                  return new Promise<void>((resolve) => {
+                    if (frame.imageElement?.complete) {
+                      resolve();
+                    } else if (frame.imageElement) {
+                      frame.imageElement.onload = () => resolve();
+                      frame.imageElement.onerror = () => resolve();
+                    } else {
+                      resolve();
+                    }
+                  });
+                })
+              );
+            }
+
+            player.animation = {
+              frames: apng.frames,
+              currentFrame: 0,
+              lastFrameTime: performance.now(),
+            };
+          }
+        } catch (error) {
+          console.error("Error handling sprite sheet animation update:", error);
+        }
+      }
+    }
+
+    animationUpdateBuffer = [];
+  } finally {
+
+    loadPlayersProcessing = false;
+
+    if (loadPlayersQueue.length > 0) {
+      const queuedData = loadPlayersQueue.shift();
+
+      setTimeout(() => {
+        handleLoadPlayersPacket(queuedData);
+      }, 0);
+    }
+  }
+}
 
 socket.onmessage = async (event) => {
   receivedResponses++;
@@ -453,19 +547,18 @@ socket.onmessage = async (event) => {
 
       if (!player_id || !target_player_id || !time_to_travel) break;
 
-      // Find source and target players
       const sourcePlayer = Array.from(cache.players).find(p => p.id === player_id);
       const targetPlayer = Array.from(cache.players).find(p => p.id === target_player_id);
 
       if (!sourcePlayer || !targetPlayer) break;
 
-      // Decompress and cache icon if provided and not already cached (same as mount icons)
       if (icon && spell && !cache.projectileIcons.has(spell)) {
-        // Check if icon has the correct structure
+
         if (!icon.data || !Array.isArray(icon.data)) break;
 
         try {
-          // @ts-expect-error - pako is loaded in index.html
+
+          //@ts-expect-error - Imported via HTML
           const inflatedData = pako.inflate(
             new Uint8Array(icon.data),
             { to: "string" }
@@ -473,20 +566,18 @@ socket.onmessage = async (event) => {
           const iconImage = new Image();
           iconImage.src = `data:image/png;base64,${inflatedData}`;
 
-          // Wait for image to load before caching
           iconImage.onload = () => {
             cache.projectileIcons.set(spell, iconImage);
           };
 
           iconImage.onerror = (error) => {
-            console.error(`Failed to load projectile icon for ${spell}:`, error);
+            console.error("Error loading projectile icon:", error);
           };
         } catch (error) {
-          console.error(`Failed to decompress projectile icon for ${spell}:`, error);
+          console.error("Error inflating projectile icon data:", error);
         }
       }
 
-      // Create projectile that follows the target player
       cache.projectiles.push({
         startX: sourcePlayer.position.x,
         startY: sourcePlayer.position.y,
@@ -494,7 +585,7 @@ socket.onmessage = async (event) => {
         currentX: sourcePlayer.position.x,
         currentY: sourcePlayer.position.y,
         startTime: performance.now(),
-        duration: time_to_travel * 1000, // Convert to milliseconds
+        duration: time_to_travel * 1000,
         spell: spell || 'unknown'
       });
 
@@ -511,14 +602,14 @@ socket.onmessage = async (event) => {
       break;
     }
     case "TOGGLE_TILE_EDITOR": {
-      // Import and toggle tile editor
+
       import('./tileeditor.js').then((module) => {
         module.default.toggle();
       });
       break;
     }
     case "RELOAD_CHUNKS": {
-      // Reload all visible chunks to reflect map changes
+
       if (window.mapData && window.mapData.loadedChunks) {
         const chunksToReload: Array<{x: number, y: number}> = [];
         window.mapData.loadedChunks.forEach((chunk: any, key: string) => {
@@ -526,10 +617,8 @@ socket.onmessage = async (event) => {
           chunksToReload.push({ x, y });
         });
 
-        // Clear loaded chunks and reload them
         window.mapData.loadedChunks.clear();
 
-        // Reload each chunk
         chunksToReload.forEach(async (pos) => {
           await window.mapData.requestChunk(pos.x, pos.y);
         });
@@ -537,23 +626,19 @@ socket.onmessage = async (event) => {
       break;
     }
     case "UPDATE_CHUNKS": {
-      // Clear and reload specific chunks that were modified
+
       if (window.mapData && window.mapData.loadedChunks && data) {
         const chunksToUpdate = data as Array<{chunkX: number, chunkY: number}>;
 
-        // Import clearChunkFromCache function
         import("./map.js").then(({ clearChunkFromCache }) => {
           chunksToUpdate.forEach((chunkCoord: {chunkX: number, chunkY: number}) => {
             const chunkKey = `${chunkCoord.chunkX}-${chunkCoord.chunkY}`;
 
-            // Clear from localStorage cache
             clearChunkFromCache(window.mapData.name, chunkCoord.chunkX, chunkCoord.chunkY);
 
-            // Remove the chunk from memory cache
             if (window.mapData.loadedChunks.has(chunkKey)) {
               window.mapData.loadedChunks.delete(chunkKey);
 
-              // Request the chunk again to reload it with updated data
               window.mapData.requestChunk(chunkCoord.chunkX, chunkCoord.chunkY);
             }
           });
@@ -562,7 +647,7 @@ socket.onmessage = async (event) => {
       break;
     }
     case "CHUNK_DATA": {
-      // Handle chunk data response from game server
+
       if (data && data.chunkX !== undefined && data.chunkY !== undefined) {
         const chunkKey = `${data.chunkX}-${data.chunkY}`;
         const resolver = pendingMapChunkRequests.get(chunkKey);
@@ -575,19 +660,19 @@ socket.onmessage = async (event) => {
     }
     case "COLLISION_DEBUG": {
       if (!data || data.tileX === undefined || data.tileY === undefined) return;
-      // Store collision tile for rendering
+
       if (!(window as any).collisionTiles) {
         (window as any).collisionTiles = [];
       }
       (window as any).collisionTiles.push({ x: data.tileX, y: data.tileY, time: Date.now() });
-      // Keep only last 10 collision tiles
+
       if ((window as any).collisionTiles.length > 10) {
         (window as any).collisionTiles.shift();
       }
       break;
     }
     case "INVITATION": {
-      // Show the invitation modal
+
       createInvitationPopup(data);
       break;
     }
@@ -606,7 +691,7 @@ socket.onmessage = async (event) => {
       break;
     }
     case "ONLINE_PLAYERS_LIST": {
-      // Update the admin panel with all online players
+
       if (data && Array.isArray(data)) {
         updateAdminPlayerListWithData(data);
       }
@@ -642,16 +727,16 @@ socket.onmessage = async (event) => {
         if (cachedData instanceof Uint8Array) {
           apng = parseAPNG(cachedData);
         } else {
-          // Check IndexedDB
+
           const dbData = await getAnimationFromDB(data.name);
           if (dbData) {
             cache.animations.set(data.name, dbData);
             apng = parseAPNG(dbData);
           } else {
-            // @ts-expect-error - pako is loaded globally
+
+            //@ts-expect-error - Imported via HTML
             const inflated = pako.inflate(new Uint8Array(data.data.data));
             if (!inflated) {
-              console.warn(`[ANIMATION] Inflation failed for: ${data.name}`);
               return;
             }
 
@@ -667,12 +752,11 @@ socket.onmessage = async (event) => {
               ? Array.from(cache.players).find((p) => p.id === data.id)
               : null;
             if (player) {
-              // Preload all images before switching animation
+
               if (apng.frames && apng.frames.length > 0) {
-                // Create images for all frames
+
                 apng.frames.forEach((frame: any) => frame.createImage());
 
-                // Wait for all images to load
                 await Promise.all(
                   apng.frames.map((frame: any) => {
                     return new Promise<void>((resolve) => {
@@ -680,7 +764,7 @@ socket.onmessage = async (event) => {
                         resolve();
                       } else if (frame.imageElement) {
                         frame.imageElement.onload = () => resolve();
-                        frame.imageElement.onerror = () => resolve(); // Resolve even on error to prevent hanging
+                        frame.imageElement.onerror = () => resolve();
                       } else {
                         resolve();
                       }
@@ -689,7 +773,6 @@ socket.onmessage = async (event) => {
                 );
               }
 
-              // Now assign the animation with all images preloaded
               player.animation = {
                 frames: apng.frames,
                 currentFrame: 0,
@@ -702,50 +785,45 @@ socket.onmessage = async (event) => {
           };
 
           findPlayer().catch((err) =>
-            console.error("Error in findPlayer:", err)
+            console.error("Error finding player for animation update:", err)
           );
         }
       } catch (error) {
-        console.error("Failed to process animation data:", error);
+        console.error("Error handling animation update:", error);
       }
       break;
     }
     case "SPRITE_SHEET_ANIMATION": {
       try {
-        // At least one sprite layer must be present to render
+
         if (!data?.bodySprite && !data?.headSprite && !data?.bodyArmorSprite && !data?.headArmorSprite) {
-          console.warn("Sprite sheet animation data has no layers to render");
           return;
         }
 
         const findPlayer = async () => {
-          // Check both active players and pending players
+
           let player = cache.players.size
             ? Array.from(cache.players).find((p) => p.id === data.id)
             : null;
 
-          // Check pending players if not found in active
           if (!player && cache.pendingPlayers) {
             player = cache.pendingPlayers.get(data.id) || null;
           }
 
           if (player) {
-            // Import layered animation system dynamically
+
             const { initializeLayeredAnimation, changeLayeredAnimation } = await import('./layeredAnimation.js');
 
-            // Process animation state and direction
             let animationState = data.animationState || 'idle';
 
-            // If animation state includes direction, extract and store it
             if (animationState.includes('_')) {
               const direction = animationState.split('_')[1];
               player.lastDirection = direction;
             } else {
-              // No direction in animation state, append last known direction
+
               animationState = `${animationState}_${player.lastDirection}`;
             }
 
-            // Check if player already has a layered animation with the same sprite sheets
             const hasExisting = player.layeredAnimation;
             const spriteSheetsChanged = hasExisting ? (
               player.layeredAnimation.layers.mount?.spriteSheet?.name !== data.mountSprite?.name ||
@@ -762,7 +840,7 @@ socket.onmessage = async (event) => {
             ) : true;
 
             if (!hasExisting || spriteSheetsChanged) {
-              // Initialize new layered animation if none exists or sprite sheets changed
+
               player.layeredAnimation = await initializeLayeredAnimation(
                 data.mountSprite || null,
                 data.bodySprite || null,
@@ -778,7 +856,7 @@ socket.onmessage = async (event) => {
                 animationState
               );
             } else {
-              // Sprite sheet names haven't changed, but update templates in case JSON content changed
+
               if (data.mountSprite && player.layeredAnimation.layers.mount) {
                 player.layeredAnimation.layers.mount.spriteSheet = data.mountSprite;
               }
@@ -814,24 +892,21 @@ socket.onmessage = async (event) => {
               }
 
               if (player.layeredAnimation.currentAnimationName !== animationState) {
-                // Change animation state if needed
+
                 await changeLayeredAnimation(player.layeredAnimation, animationState);
               }
             }
 
-            // Clear old APNG animation if present
             player.animation = null;
 
-            // If this is the self-player, mark sprite as loaded
             if (data.id === cachedPlayerId) {
               setSelfPlayerSpriteLoaded(true);
             }
 
-            // If player was pending, move to active cache now that animation is loaded
             if (cache.pendingPlayers && cache.pendingPlayers.has(data.id)) {
               cache.pendingPlayers.delete(data.id);
               cache.players.add(player);
-              // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
             }
           } else {
@@ -841,26 +916,24 @@ socket.onmessage = async (event) => {
         };
 
         findPlayer().catch((err) =>
-          console.error("Error in findPlayer (sprite sheet):", err)
+          console.error("Error finding player for sprite sheet animation update:", err)
         );
       } catch (error) {
-        console.error("Failed to process sprite sheet animation data:", error);
+        console.error("Error handling sprite sheet animation update:", error);
       }
       break;
     }
     case "BATCH_SPRITE_SHEET_ANIMATION": {
       try {
-        // Process array of animation data
+
         if (!Array.isArray(data) || data.length === 0) {
-          console.warn("BATCH_SPRITE_SHEET_ANIMATION received invalid data");
           return;
         }
 
-        // Process each animation in the batch sequentially
         for (const animationData of data) {
-          // Reuse the existing SPRITE_SHEET_ANIMATION logic
+
           if (!animationData?.bodySprite && !animationData?.headSprite && !animationData?.bodyArmorSprite && !animationData?.headArmorSprite) {
-            continue; // Skip invalid animations
+            continue;
           }
 
           const player = cache.players.size
@@ -874,10 +947,9 @@ socket.onmessage = async (event) => {
           const targetPlayer = player || pendingPlayer;
 
           if (targetPlayer) {
-            // Import layered animation system dynamically
+
             const { initializeLayeredAnimation, changeLayeredAnimation } = await import('./layeredAnimation.js');
 
-            // Process animation state and direction
             let animationState = animationData.animationState || 'idle';
 
             if (animationState.includes('_')) {
@@ -887,7 +959,6 @@ socket.onmessage = async (event) => {
               animationState = `${animationState}_${targetPlayer.lastDirection}`;
             }
 
-            // Check if player already has a layered animation
             const hasExisting = targetPlayer.layeredAnimation;
             const spriteSheetsChanged = hasExisting ? (
               targetPlayer.layeredAnimation.layers.mount?.spriteSheet?.name !== animationData.mountSprite?.name ||
@@ -919,11 +990,10 @@ socket.onmessage = async (event) => {
                 animationState
               );
             } else {
-              // Just change animation state
+
               await changeLayeredAnimation(targetPlayer.layeredAnimation, animationState);
             }
 
-            // Move from pending to active if needed
             if (cache.pendingPlayers && cache.pendingPlayers.has(animationData.id)) {
               cache.pendingPlayers.delete(animationData.id);
               cache.players.add(targetPlayer);
@@ -931,10 +1001,9 @@ socket.onmessage = async (event) => {
           }
         }
 
-        // Request fresh player list after batch processing
         sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
       } catch (error) {
-        console.error("Failed to process batched sprite sheet animations:", error);
+        console.error("Error handling sprite sheet animation update:", error);
       }
       break;
     }
@@ -947,32 +1016,34 @@ socket.onmessage = async (event) => {
     case "CONNECTION_COUNT": {
       onlinecount.innerText = `${data} online`;
       break;
-    } 
+    }
     case "SPAWN_PLAYER": {
-      // Reject spawn packets if session is not yet authenticated
+
       if (!sessionActive || !cachedPlayerId) {
         break;
       }
 
       await isLoaded();
 
-      // Remove any existing player with the same username/userid (handles reconnects/refreshes)
       const existingByUsername = Array.from(cache.players).find(
         (p) => p.username === data.username && p.userid === data.userid
       );
-      if (existingByUsername) {
+
+      const existingInPending = cache.pendingPlayers?.get(data.id);
+
+      if (!existingByUsername && !existingInPending) {
+        await createPlayer(data);
+      } else if (existingByUsername) {
+
         cache.players.delete(existingByUsername);
+        await createPlayer(data);
       }
 
-      await createPlayer(data);
-      // Request fresh player list from server for admin panel
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
 
-      // Update currency display if this is the current player
       if (data.id === cachedPlayerId) {
         updateCurrencyDisplay();
 
-        // Initialize button states for noclip and stealth
         const noclipButton = document.getElementById("admin-noclip");
         const stealthButton = document.getElementById("admin-stealth");
 
@@ -999,116 +1070,7 @@ socket.onmessage = async (event) => {
       break;
     }
     case "LOAD_PLAYERS": {
-      // Reject load players if session is not yet authenticated
-      if (!sessionActive || !cachedPlayerId) {
-        break;
-      }
-
-      await isLoaded();
-      if (!data) return;
-
-      const players = data.players || data;
-      snapshotRevision = data.snapshotRevision ?? null;
-
-      // Create players sequentially to ensure they're in cache before position updates arrive
-      const playerArray = Array.isArray(players) ? players : [];
-      for (const player of playerArray) {
-        if (player.id != cachedPlayerId) {
-          // Check if player already exists by username/userid (not just ID)
-          const existingByUsername = Array.from(cache.players).find(
-            (p) => p.username === player.username && p.userid === player.userid
-          );
-
-          if (!existingByUsername) {
-            await createPlayer(player);
-          }
-        }
-      }
-
-      snapshotApplied = true;
-
-      // Apply any pending movements that arrived before players were created
-      if (pendingMovements.length > 0) {
-        for (const movement of pendingMovements) {
-          const player = Array.from(cache.players).find(
-            (p) => p.id === movement.id
-          );
-          if (player && movement._data) {
-            player.position.x = movement._data.x;
-            player.position.y = movement._data.y;
-            if (movement.id === cachedPlayerId) {
-              positionText.innerText = `Position: ${movement._data.x}, ${movement._data.y}`;
-            }
-          }
-        }
-        pendingMovements = []; // Clear the buffer
-      }
-
-      // Clear any buffered animations (movements are no longer buffered)
-      const bufferedAnimations = animationUpdateBuffer
-        .filter(update => snapshotRevision === null || update.revision > snapshotRevision)
-        .sort((a, b) => a.revision - b.revision);
-
-      for (const update of bufferedAnimations) {
-        const player = Array.from(cache.players).find(p => p.id === update.id);
-        if (player) {
-          try {
-            let apng: any;
-            const cachedData = cache.animations.get(update.name);
-
-            if (cachedData instanceof Uint8Array) {
-              apng = parseAPNG(cachedData);
-            } else {
-              // Check IndexedDB
-              const dbData = await getAnimationFromDB(update.name);
-              if (dbData) {
-                cache.animations.set(update.name, dbData);
-                apng = parseAPNG(dbData);
-              } else {
-                // @ts-expect-error - pako is loaded globally
-                const inflated = pako.inflate(new Uint8Array(update.data.data));
-                if (inflated) {
-                  cache.animations.set(update.name, inflated);
-                  await saveAnimationToDB(update.name, inflated);
-                  apng = parseAPNG(inflated);
-                }
-              }
-            }
-
-            if (!(apng instanceof Error)) {
-              // Preload all images
-              if (apng.frames && apng.frames.length > 0) {
-                apng.frames.forEach((frame: any) => frame.createImage());
-                await Promise.all(
-                  apng.frames.map((frame: any) => {
-                    return new Promise<void>((resolve) => {
-                      if (frame.imageElement?.complete) {
-                        resolve();
-                      } else if (frame.imageElement) {
-                        frame.imageElement.onload = () => resolve();
-                        frame.imageElement.onerror = () => resolve();
-                      } else {
-                        resolve();
-                      }
-                    });
-                  })
-                );
-              }
-
-              player.animation = {
-                frames: apng.frames,
-                currentFrame: 0,
-                lastFrameTime: performance.now(),
-              };
-            }
-          } catch (error) {
-            console.error("Failed to process buffered animation:", error);
-          }
-        }
-      }
-
-      animationUpdateBuffer = [];
-
+      await handleLoadPlayersPacket(data);
       break;
     }
     case "DISCONNECT_MALIFORMED": {
@@ -1122,7 +1084,7 @@ socket.onmessage = async (event) => {
           cache.players.delete(player);
         }
       });
-      // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
       break;
     }
@@ -1131,43 +1093,37 @@ socket.onmessage = async (event) => {
 
       updateFriendOnlineStatus(data.username, false);
 
-      // Remove player from the array
       const player = Array.from(cache.players).find(
         (player) => player.id === data.id
       );
       if (player) {
         cache.players.delete(player);
-        // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
       }
-      // If they were targeted, hide target stats
-      // if (wasTargeted) {
-      //   displayElement(targetStats, false);
-      // }
+
       break;
     }
     case "DESPAWN_PLAYER": {
       if (!data || !data.id) return;
 
-      // Remove player from the local cache (they left AOI)
       const player = Array.from(cache.players).find(
         (player) => player.id === data.id
       );
       if (player) {
         cache.players.delete(player);
-        // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
       }
       break;
     }
     case "BATCH_DISCONNECT_PLAYER": {
-      // Handle batched disconnect/despawn packets
+
       if (!Array.isArray(data)) return;
 
       data.forEach((despawnData: { id: string; reason: string }) => {
         if (!despawnData.id) return;
 
-        // Remove player from the local cache
         const player = Array.from(cache.players).find(
           (p) => p.id === despawnData.id
         );
@@ -1175,7 +1131,7 @@ socket.onmessage = async (event) => {
           cache.players.delete(player);
         }
       });
-      // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
       break;
     }
@@ -1184,7 +1140,6 @@ socket.onmessage = async (event) => {
         break;
       }
 
-      // Skip processing if session not active or player not spawned yet
       if (!sessionActive || !cachedPlayerId) {
         break;
       }
@@ -1196,7 +1151,6 @@ socket.onmessage = async (event) => {
 
       player.typing = false;
 
-      // Support short keys (d) and old format (_data)
       const moveData = data.d || data._data;
       const playerId = data.i || data.id;
 
@@ -1209,16 +1163,15 @@ socket.onmessage = async (event) => {
       break;
     }
     case "BATCH_MOVEXY": {
-      // Handle batched movement updates - data is an array of movements
+
       if (!Array.isArray(data)) break;
 
-      // Skip processing if session not active
       if (!sessionActive || !cachedPlayerId) {
         break;
       }
 
       for (const movement of data) {
-        // Support short keys (i, d) and old format (id, _data)
+
         const moveData = movement.d || movement._data;
         const playerId = movement.i || movement.id;
 
@@ -1229,8 +1182,7 @@ socket.onmessage = async (event) => {
         );
 
         if (!player) {
-          // Player doesn't exist yet - buffer this movement for later application
-          // This happens when BATCH_MOVEXY arrives before LOAD_PLAYERS creates the player
+
           if (!snapshotApplied) {
             pendingMovements.push(movement);
           }
@@ -1257,12 +1209,10 @@ socket.onmessage = async (event) => {
       {
         loaded = await loadMap(data);
 
-        // Check if we should hide loading screen now (in case sprite loaded first)
         if (loaded && selfPlayerSpriteLoaded) {
           hideLoadingScreen();
         }
 
-        // Update admin map input with current map name
         if (loaded) {
           updateAdminMapInput();
         }
@@ -1279,7 +1229,7 @@ socket.onmessage = async (event) => {
         sessionActive = true;
 
         cache.players.clear();
-        // Request fresh player list from server for admin panel
+
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
 
         snapshotRevision = null;
@@ -1293,7 +1243,6 @@ socket.onmessage = async (event) => {
           return;
         }
 
-        // Store public key
         sessionStorage.setItem("chatDecryptionKey", chatDecryptionKey);
 
         const language =
@@ -1317,39 +1266,35 @@ socket.onmessage = async (event) => {
       const grid = spellBookUI.querySelector("#grid");
       if (!grid) return;
 
-      // Clear existing slots
       grid.querySelectorAll(".slot").forEach((slot) => {
         grid.removeChild(slot);
       });
 
-      // Convert data object to array if needed
       const spellsArray = Array.isArray(data) ? data : Object.values(data);
 
       if (spellsArray.length > 0) {
-        // Assign each spell to a slot
+
         for (let i = 0; i < spellsArray.length; i++) {
           const spell = spellsArray[i];
 
-          // Create a new slot
           const slot = document.createElement("div");
           slot.classList.add("slot");
           slot.classList.add("ui");
           slot.classList.add("common");
 
-          // Make slot draggable and store spell data
           slot.draggable = true;
           slot.dataset.spellName = spell.name || Object.keys(data)[i] || 'Unknown';
 
-          // Add icon if available
           if (spell.sprite?.data) {
-            // @ts-expect-error - pako is loaded in index.html
+
+            //@ts-expect-error - Imported via HTML
             const inflatedData = pako.inflate(
               new Uint8Array(spell.sprite.data),
               { to: "string" }
             );
             const iconImage = new Image();
             iconImage.src = `data:image/png;base64,${inflatedData}`;
-            // Scale to 32x32
+
             iconImage.width = 32;
             iconImage.height = 32;
             iconImage.draggable = false;
@@ -1357,16 +1302,15 @@ socket.onmessage = async (event) => {
               slot.appendChild(iconImage);
             };
           } else {
-            // Fallback if no icon
+
             slot.innerHTML = `${spell.name || Object.keys(data)[i] || 'Unknown'}`;
           }
 
-          // Add dragstart event
           slot.addEventListener("dragstart", (event: DragEvent) => {
             if (event.dataTransfer) {
               event.dataTransfer.effectAllowed = "copy";
               event.dataTransfer.setData("text/plain", slot.dataset.spellName || '');
-              // Store the icon data for the drop
+
               const iconImg = slot.querySelector('img');
               if (iconImg) {
                 event.dataTransfer.setData("image/src", iconImg.src);
@@ -1374,7 +1318,6 @@ socket.onmessage = async (event) => {
             }
           });
 
-          // Add click event to cast spell
           slot.addEventListener("click", () => {
             const target = Array.from(cache?.players).find(p => p?.targeted) || null;
             sendRequest({
@@ -1390,8 +1333,7 @@ socket.onmessage = async (event) => {
         }
       }
 
-      // Create empty slots for remaining space
-      const totalSlots = slots || 20; // Default to 20 if slots not provided
+      const totalSlots = slots || 20;
       for (let i = spellsArray.length; i < totalSlots; i++) {
         const slot = document.createElement("div");
         slot.classList.add("slot");
@@ -1400,19 +1342,17 @@ socket.onmessage = async (event) => {
         grid.appendChild(slot);
       }
 
-      // Populate hotbar slots with icons if they have spell names configured
       hotbarSlots.forEach((hotbarSlot) => {
         const spellName = hotbarSlot.dataset.spellName;
         if (spellName) {
 
-          // Find matching spell in the spellsArray
           const matchingSpell = spellsArray.find((spell: any) =>
             (spell.name || '') === spellName
           );
 
           if (matchingSpell && matchingSpell.sprite?.data) {
 
-            // @ts-expect-error - pako is loaded in index.html
+            //@ts-expect-error - Imported via HTML
             const inflatedData = pako.inflate(
               new Uint8Array(matchingSpell.sprite.data),
               { to: "string" }
@@ -1423,7 +1363,6 @@ socket.onmessage = async (event) => {
             iconImage.height = 32;
             iconImage.draggable = false;
 
-            // Clear and add icon
             hotbarSlot.innerHTML = "";
             hotbarSlot.classList.remove("empty");
             iconImage.onload = () => {
@@ -1443,38 +1382,38 @@ socket.onmessage = async (event) => {
         const grid = collectablesUI.querySelector("#grid");
         if (!grid) return;
 
-        // Clear existing slots
         grid.querySelectorAll(".slot").forEach((slot) => {
           grid.removeChild(slot);
         });
 
         if (data.length > 0) {
-          // Assign each collectable to a slot
+
           for (let i = 0; i < data.length; i++) {
-            // Create a new slot
+
             const slot = document.createElement("div");
             slot.classList.add("slot");
             slot.classList.add("ui");
             slot.classList.add("epic");
-            // Add icon if available
+
             if (data[i].icon) {
-              // @ts-expect-error - pako is loaded in index.html
+
+              //@ts-expect-error - Imported via HTML
               const inflatedData = pako.inflate(
                 new Uint8Array(data[i].icon.data),
                 { to: "string" }
               );
               const iconImage = new Image();
               iconImage.src = `data:image/png;base64,${inflatedData}`;
-              // Scale to 32x32
+
               iconImage.width = 32;
               iconImage.height = 32;
               iconImage.draggable = false;
               iconImage.onload = () => {
                 slot.appendChild(iconImage);
               };
-              // Add event listener to summon mount on click
+
               slot.addEventListener("click", () => {
-                // Mounts
+
                 if (data[i].type === "mount") {
                   cache.mount = data[i].item;
                   sendRequest({
@@ -1491,7 +1430,6 @@ socket.onmessage = async (event) => {
           }
         }
 
-        // Create empty slots for remaining space
         for (let i = 0; i < slots - data.length; i++) {
           const slot = document.createElement("div");
           slot.classList.add("slot");
@@ -1504,27 +1442,19 @@ socket.onmessage = async (event) => {
     case "EQUIPMENT": {
       const data = JSON.parse(packet.decode(event.data))["data"];
 
-      // Store equipment data in cache
       cache.equipment = data;
 
-      // Only update equipment slots if stat sheet is closed or showing current player
       const statSheetOpen = statUI.style.left === "10px";
       const showingCurrentPlayer = statUI.getAttribute("data-id") === cachedPlayerId;
 
-      // Skip updating equipment UI if viewing another player's stats
       if (statSheetOpen && !showingCurrentPlayer) {
         break;
       }
 
-      // Completely remove and recreate all equipment slots to ensure clean state
-      // This fixes the issue where event listeners don't work on initial page load
-
-      // Store the slot types we need to recreate
       const leftSlots = ['helmet', 'necklace', 'shoulderguards', 'chestplate', 'wristguards', 'gloves', 'belt', 'pants'];
       const rightSlots = ['boots', 'ring_1', 'ring_2', 'trinket_1', 'trinket_2'];
       const bottomSlots = ['weapon', 'off_hand_weapon'];
 
-      // Clear left column
       equipmentLeftColumn.innerHTML = '';
       leftSlots.forEach(slotType => {
         const slot = document.createElement('div');
@@ -1533,7 +1463,6 @@ socket.onmessage = async (event) => {
         equipmentLeftColumn.appendChild(slot);
       });
 
-      // Clear right column
       equipmentRightColumn.innerHTML = '';
       rightSlots.forEach(slotType => {
         const slot = document.createElement('div');
@@ -1542,7 +1471,6 @@ socket.onmessage = async (event) => {
         equipmentRightColumn.appendChild(slot);
       });
 
-      // Clear bottom center
       equipmentBottomCenter.innerHTML = '';
       bottomSlots.forEach(slotType => {
         const slot = document.createElement('div');
@@ -1551,48 +1479,39 @@ socket.onmessage = async (event) => {
         equipmentBottomCenter.appendChild(slot);
       });
 
-      // Re-setup equipment slot handlers for drag-and-drop from inventory
       setupEquipmentSlotHandlers();
 
-      // Populate equipment slots with equipped items
       for (const [slotName, itemName] of Object.entries(data)) {
-        if (!itemName) continue; // Skip empty slots
+        if (!itemName) continue;
 
-        // Skip body and head - these are sprite sheet template names, not UI equipment slots
         if (slotName === 'body' || slotName === 'head') continue;
 
-        // Query for the slot element
         const slotElement = document.querySelector(`.slot[data-slot="${slotName}"]`) as HTMLDivElement;
         if (!slotElement) {
-          console.warn(`Equipment slot not found for: ${slotName}`);
           continue;
         }
 
-        // Get item details from inventory cache to display icon
-        // If inventory isn't loaded yet, this will be populated when INVENTORY packet arrives
         const inventoryData = cache.inventory || [];
         const itemDetails = inventoryData.find((item: any) => item.name === itemName);
 
         if (itemDetails && itemDetails.icon) {
-          // Remove empty class and add quality class
+
           if (itemDetails.quality) {
             slotElement.classList.add(itemDetails.quality.toLowerCase());
             slotElement.classList.remove("empty");
           }
 
-          // @ts-expect-error - pako is loaded in index.html
+          //@ts-expect-error - Imported via HTML
           const inflatedData = pako.inflate(
             new Uint8Array(itemDetails.icon.data),
             { to: "string" }
           );
           const iconSrc = `data:image/png;base64,${inflatedData}`;
 
-          // Add event listeners for unequipping
           slotElement.ondblclick = () => {
-            // Hide tooltip when unequipping
+
             hideItemTooltip();
 
-            // Find first empty inventory slot
             const inventorySlots = inventoryGrid.querySelectorAll(".slot");
             let firstEmptySlot = -1;
             inventorySlots.forEach((invSlot, idx) => {
@@ -1607,9 +1526,8 @@ socket.onmessage = async (event) => {
             });
           };
 
-
           slotElement.ondragstart = (event: DragEvent) => {
-            // Hide tooltip when starting to drag
+
             hideItemTooltip();
 
             if (event.dataTransfer) {
@@ -1624,11 +1542,9 @@ socket.onmessage = async (event) => {
             slotElement.style.opacity = "1";
           };
 
-          // Make equipped item draggable
           slotElement.draggable = true;
           slotElement.dataset.equippedItem = String(itemName);
 
-          // Add the image
           const iconImage = new Image();
           iconImage.draggable = false;
           iconImage.width = 32;
@@ -1639,19 +1555,16 @@ socket.onmessage = async (event) => {
           };
           iconImage.src = iconSrc;
 
-          // Setup tooltip for equipped item
           setupItemTooltip(slotElement, () => itemDetails);
         } else {
-          // If no icon, just show item name
+
           slotElement.innerHTML = String(itemName);
           slotElement.classList.remove("empty");
 
-          // Add double-click to unequip
           slotElement.addEventListener("dblclick", () => {
-            // Hide tooltip when unequipping
+
             hideItemTooltip();
 
-            // Find first empty inventory slot
             const inventorySlots = inventoryGrid.querySelectorAll(".slot");
             let firstEmptySlot = -1;
             inventorySlots.forEach((invSlot, idx) => {
@@ -1666,12 +1579,11 @@ socket.onmessage = async (event) => {
             });
           });
 
-          // Make equipped item draggable for unequipping
           slotElement.draggable = true;
           slotElement.dataset.equippedItem = String(itemName);
 
           slotElement.addEventListener("dragstart", (event: DragEvent) => {
-            // Hide tooltip when starting to drag
+
             hideItemTooltip();
 
             if (event.dataTransfer) {
@@ -1686,7 +1598,6 @@ socket.onmessage = async (event) => {
             slotElement.style.opacity = "1";
           });
 
-          // Setup tooltip for equipped item
           setupItemTooltip(slotElement, () => itemDetails);
         }
       }
@@ -1698,17 +1609,14 @@ socket.onmessage = async (event) => {
         const data = JSON.parse(packet.decode(event.data))["data"];
         const slots = JSON.parse(packet.decode(event.data))["slots"];
 
-        // Store inventory data in cache for equipment handler to access
         cache.inventory = data;
 
-        // Clear existing slots
         inventoryGrid.querySelectorAll(".slot").forEach((slot) => {
-          // Remove tooltip event listeners before removing slot
+
           removeItemTooltip(slot as HTMLElement);
           inventoryGrid.removeChild(slot);
         });
 
-        // Create a map of items by name for quick lookup (only unequipped items)
         const itemMap: { [key: string]: any } = {};
         data.forEach((item: any) => {
           if (!item.equipped) {
@@ -1716,25 +1624,22 @@ socket.onmessage = async (event) => {
           }
         });
 
-        // Build slot array - create exactly 'slots' number of slots
         const slotArray: (any | null)[] = new Array(slots).fill(null);
 
-        // Apply saved inventory configuration if available
         if (cache.inventoryConfig) {
-          // Place items according to configuration
+
           for (const slotIndex in cache.inventoryConfig) {
             const itemName = cache.inventoryConfig[slotIndex];
             const idx = parseInt(slotIndex);
             if (itemName && itemMap[itemName] && idx >= 0 && idx < slots) {
               slotArray[idx] = itemMap[itemName];
-              delete itemMap[itemName]; // Remove from map so we don't add it twice
+              delete itemMap[itemName];
             }
           }
 
-          // Add any remaining unequipped items that aren't in the config
           let nextEmptySlot = 0;
           for (const itemName in itemMap) {
-            // Find next empty slot
+
             while (nextEmptySlot < slots && slotArray[nextEmptySlot] !== null) {
               nextEmptySlot++;
             }
@@ -1744,7 +1649,7 @@ socket.onmessage = async (event) => {
             }
           }
         } else {
-          // No configuration - just add unequipped items sequentially
+
           let slotIndex = 0;
           for (const itemName in itemMap) {
             if (slotIndex < slots) {
@@ -1754,7 +1659,6 @@ socket.onmessage = async (event) => {
           }
         }
 
-        // Now render all slots
         for (let i = 0; i < slots; i++) {
           const slot = document.createElement("div");
           slot.classList.add("slot");
@@ -1764,18 +1668,18 @@ socket.onmessage = async (event) => {
           const item = slotArray[i];
 
           if (item) {
-            // Item slot
+
             slot.classList.add(item.quality.toLowerCase() || "common");
 
             if (item.icon) {
-              // @ts-expect-error - pako is loaded in index.html
+
+              //@ts-expect-error - Imported via HTML
               const inflatedData = pako.inflate(
                 new Uint8Array(item.icon.data),
                 { to: "string" }
               );
               const iconSrc = `data:image/png;base64,${inflatedData}`;
 
-              // Use cached image to prevent flickering (synchronous for base64)
               const iconImage = createCachedImage(iconSrc);
               iconImage.draggable = false;
               iconImage.style.pointerEvents = "none";
@@ -1783,7 +1687,6 @@ socket.onmessage = async (event) => {
               iconImage.height = 32;
               slot.appendChild(iconImage);
 
-              // Overlay item quantity if greater than 1
               if (item.quantity > 1) {
                 const quantityLabel = document.createElement("div");
                 quantityLabel.classList.add("quantity-label");
@@ -1792,22 +1695,18 @@ socket.onmessage = async (event) => {
                 slot.appendChild(quantityLabel);
               }
 
-              // Store item data
               slot.dataset.itemName = item.name;
               slot.dataset.itemType = item.type;
 
-              // If equipment type, add equipment slot data
               if (item.type === "equipment") {
                 slot.dataset.equipmentSlot = item.equipment_slot;
               }
 
-              // Make item slots draggable
               slot.draggable = true;
               slot.setAttribute("draggable", "true");
 
-              // Setup tooltip for this item - look up item data from slot's dataset
               setupItemTooltip(slot, () => {
-                // Get item from cache using the slot's stored item name
+
                 const itemName = slot.dataset.itemName;
                 if (!itemName || !cache.inventory) return null;
                 return cache.inventory.find((invItem: any) => invItem.name === itemName);
@@ -1824,59 +1723,57 @@ socket.onmessage = async (event) => {
               slot.draggable = true;
               slot.setAttribute("draggable", "true");
 
-              // Setup tooltip for this item - look up item data from slot's dataset
               setupItemTooltip(slot, () => {
-                // Get item from cache using the slot's stored item name
+
                 const itemName = slot.dataset.itemName;
                 if (!itemName || !cache.inventory) return null;
                 return cache.inventory.find((invItem: any) => invItem.name === itemName);
               });
             }
           } else {
-            // Empty slot
+
             slot.classList.add("empty");
           }
 
           inventoryGrid.appendChild(slot);
         }
 
-        // Setup drag and drop handlers for all inventory slots
         setupInventorySlotHandlers();
       }
       break;
     case "QUESTLOG": {
-      // const data = JSON.parse(packet.decode(event.data))["data"];
+
       break;
     }
     case "QUESTDETAILS": {
-      // const data = JSON.parse(packet.decode(event.data))["data"];
+
       break;
     }
     case "CHAT": {
       cache.players.forEach((player) => {
         if (player.id === data.id) {
-          // Escape HTML tags before setting chat message
+
           player.chat = data.message;
-          player.chatType = "normal"; // Set chat type to normal
-          // Username with first letter uppercase
+          player.chatType = "normal";
+
           const username =
             data?.username?.charAt(0)?.toUpperCase() + data?.username?.slice(1);
           const timestamp = new Date().toLocaleTimeString();
-          // Update chat box
+
           if (data.message?.trim() !== "" && username) {
             const message = document.createElement("div");
             message.classList.add("message");
             message.classList.add("ui");
             message.style.userSelect = "text";
-            // Escape HTML in the message before inserting
+
             const escapedMessage = data.message
               .replace(/</g, "&lt;")
               .replace(/>/g, "&gt;");
             message.innerHTML = `<span>${timestamp} <span ${player.isAdmin ? "class='admin'" : "class='user'"}>${username}: </span><span>${escapedMessage.toString()}</span></span>`;
             chatMessages.appendChild(message);
-            // Scroll to the bottom of the chat messages
+
             chatMessages.scrollTop = chatMessages.scrollHeight;
-            // Set typing to false
+
             player.typing = false;
           }
         }
@@ -1887,11 +1784,11 @@ socket.onmessage = async (event) => {
       cache.players.forEach((player) => {
         if (player.id === data.id) {
           player.typing = true;
-          // Clear any existing timeout for this player
+
           if (player.typingTimeout) {
             clearTimeout(player.typingTimeout);
           }
-          // Set typing to false after 5 seconds
+
           player.typingTimeout = setTimeout(() => {
             player.typing = false;
           }, 3000);
@@ -1923,7 +1820,6 @@ socket.onmessage = async (event) => {
       player.max_health = data.total_max_health;
       player.max_stamina = data.total_max_stamina;
 
-      // Update stat sheet if it's open and showing this player's stats
       if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === data.id) {
         levelLabel!.innerText = `Level: ${data.level}`;
         healthLabel!.innerText = `Health: ${data.health} / ${data.total_max_health}`;
@@ -1935,7 +1831,6 @@ socket.onmessage = async (event) => {
         avoidanceLabel!.innerText = `Avoidance: ${data.stat_avoidance || 0}%`;
       }
 
-      // Update party member UI if this player is in the party
       const currentPlayer = Array.from(cache.players).find(
         (p) => p.id === cachedPlayerId
       );
@@ -1969,21 +1864,16 @@ socket.onmessage = async (event) => {
         "muted-checkbox"
       )!.innerText = `Muted: ${mutedCheckbox.checked}`;
 
-      // Load hotbar configuration (async)
       if (data.hotbar_config) {
-        loadHotbarConfiguration(data.hotbar_config).catch(err =>
-          console.error('Failed to load hotbar configuration:', err)
-        );
+        loadHotbarConfiguration(data.hotbar_config);
       }
 
-      // Store inventory configuration in cache for later use
       if (data.inventory_config) {
-        // Handle both string and object cases (depends on database driver)
+
         if (typeof data.inventory_config === 'string') {
           try {
             cache.inventoryConfig = JSON.parse(data.inventory_config);
           } catch (error) {
-            console.error('Failed to parse inventory_config:', error);
             cache.inventoryConfig = {};
           }
         } else if (typeof data.inventory_config === 'object' && data.inventory_config !== null) {
@@ -2000,7 +1890,7 @@ socket.onmessage = async (event) => {
       if (!data || !data.id || !data.username) {
         const target = Array.from(cache.players).find((p) => p.targeted);
         if (target) target.targeted = false;
-        //displayElement(targetStats, false);
+
         break;
       }
 
@@ -2008,7 +1898,6 @@ socket.onmessage = async (event) => {
         player.targeted = player.id === data.id;
       });
 
-      // displayElement(targetStats, true);
       break;
     }
     case "NOCLIP": {
@@ -2017,7 +1906,6 @@ socket.onmessage = async (event) => {
         (player) => player.id === cachedPlayerId || player.id === cachedPlayerId
       );
 
-      // Update noclip button color if self
       if (currentPlayer && data.id === currentPlayer.id) {
         const noclipButton = document.getElementById("admin-noclip");
         if (noclipButton) {
@@ -2037,14 +1925,12 @@ socket.onmessage = async (event) => {
         (player) => player.id === cachedPlayerId || player.id === cachedPlayerId
       );
 
-      // Abort movement if self
       if (currentPlayer && data.id === currentPlayer.id) {
         sendRequest({
           type: "MOVEXY",
           data: "ABORT",
         });
 
-        // Update stealth button color if self
         const stealthButton = document.getElementById("admin-stealth");
         if (stealthButton) {
           if (data.isStealth) {
@@ -2060,10 +1946,9 @@ socket.onmessage = async (event) => {
           player.isStealth = data.isStealth;
         }
 
-        // Untarget stealthed players
         if (player.isStealth && player.targeted) {
           player.targeted = false;
-          //displayElement(targetStats, false);
+
         }
       });
 
@@ -2075,38 +1960,35 @@ socket.onmessage = async (event) => {
         (player) => player.id === target
       );
 
-      // Get current player for party check
       const currentPlayer = Array.from(cache.players).find(
         (player) => player.id === cachedPlayerId
       );
 
       if (t) {
-        // Track health change for damage numbers
+
         const oldHealth = t.stats.health;
         const newHealth = stats.health;
         const healthDiff = newHealth - oldHealth;
 
-        // Check if this is a revive scenario (but not a death scenario)
         const isRevive = (oldHealth <= 0 && newHealth === stats.total_max_health) ||
                          (newHealth === stats.total_max_health && healthDiff > stats.total_max_health * 0.5);
 
-        // Show damage/heal numbers if health changed (including death)
         if (healthDiff !== 0 && oldHealth > 0 && !isRevive) {
-          // Add slight random offset so multiple damage numbers don't overlap
+
           const randomOffsetX = (Math.random() - 0.5) * 20;
           const randomOffsetY = (Math.random() - 0.5) * 10;
 
           t.damageNumbers.push({
             value: Math.abs(healthDiff),
             x: t.position.x + randomOffsetX,
-            y: t.position.y - 30 + randomOffsetY, // Start above player's head
+            y: t.position.y - 30 + randomOffsetY,
             startTime: performance.now(),
             isHealing: healthDiff > 0,
             isCrit: isCrit || false,
             isMiss: false,
           });
         } else if (damage === 0 && newHealth > 0 && oldHealth > 0 && !isRevive) {
-          // Show "Miss" when incoming damage is exactly 0 (avoided)
+
           const randomOffsetX = (Math.random() - 0.5) * 20;
           const randomOffsetY = (Math.random() - 0.5) * 10;
 
@@ -2125,7 +2007,6 @@ socket.onmessage = async (event) => {
         t.max_health = stats.total_max_health;
         t.max_stamina = stats.total_max_stamina;
 
-        // Update stat sheet if it's open and showing this player's stats
         if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === target) {
           levelLabel!.innerText = `Level: ${stats.level}`;
           healthLabel!.innerText = `Health: ${stats.health} / ${stats.total_max_health}`;
@@ -2137,7 +2018,6 @@ socket.onmessage = async (event) => {
           avoidanceLabel!.innerText = `Avoidance: ${stats.stat_avoidance || 0}%`;
         }
 
-        // Update party member UI if this player is in the party
         if (currentPlayer?.party?.includes(t.username)) {
           updatePartyMemberStats(
             t.username,
@@ -2148,8 +2028,7 @@ socket.onmessage = async (event) => {
           );
         }
       } else if (username && currentPlayer?.party?.includes(username)) {
-        // Player not in visible cache but is a party member and we have their username
-        // Update their party frame directly
+
         updatePartyMemberStats(
           username,
           stats.health,
@@ -2177,10 +2056,8 @@ socket.onmessage = async (event) => {
         target.targeted = false;
       }
 
-      //displayElement(targetStats, false);
       cache.players.forEach((player) => (player.targeted = false));
 
-      // Update party member UI if this player is in the party
       const currentPlayer = Array.from(cache.players).find(
         (player) => player.id === cachedPlayerId
       );
@@ -2197,7 +2074,7 @@ socket.onmessage = async (event) => {
     }
     case "UPDATE_XP": {
       const data = JSON.parse(packet.decode(event.data))["data"];
-      // Only update the xp bar if the current player is the target
+
       if (data.id === cachedPlayerId) {
         updateXp(data.xp, data.level, data.max_xp);
       }
@@ -2206,10 +2083,8 @@ socket.onmessage = async (event) => {
     case "INSPECTPLAYER": {
       const data = JSON.parse(packet.decode(event.data))["data"];
 
-      // IMPORTANT: Get the PREVIOUS player ID BEFORE updating it
       const previousShownId = statUI.getAttribute("data-id");
 
-      // Set username with first letter capitalized
       const username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
       usernameLabel!.innerText = username;
 
@@ -2222,9 +2097,8 @@ socket.onmessage = async (event) => {
       critDamageLabel!.innerText = `Critical Damage: ${data.stats.stat_critical_damage || 0}%`;
       avoidanceLabel!.innerText = `Avoidance: ${data.stats.stat_avoidance || 0}%`;
 
-      // Handle equipment display based on who is being inspected
       if (data.id !== cachedPlayerId && data.equipment) {
-        // Inspecting OTHER player - clear slots and show their equipment (no event handlers)
+
         const allSlots = [
           ...equipmentLeftColumn.querySelectorAll(".slot"),
           ...equipmentRightColumn.querySelectorAll(".slot"),
@@ -2232,43 +2106,34 @@ socket.onmessage = async (event) => {
         ];
 
         allSlots.forEach((slot) => {
-          // Remove tooltip event listeners before clearing
+
           removeItemTooltip(slot as HTMLElement);
 
-          // Remove ALL event listeners by cloning and replacing the node
           const newSlot = slot.cloneNode(false) as HTMLElement;
 
-          // Preserve the slot type attribute
           const slotType = slot.getAttribute("data-slot");
           if (slotType) {
             newSlot.setAttribute("data-slot", slotType);
           }
 
-          // Clear the slot content
           newSlot.innerHTML = "";
           newSlot.className = "slot empty ui";
 
-          // Add a unique update ID to prevent stale image loads from appending
           (newSlot as any)._updateId = Date.now() + Math.random();
 
-          // Replace old slot with new one (this removes all event listeners)
           slot.parentNode?.replaceChild(newSlot, slot);
         });
 
-        // Populate equipment slots - simplified version without event handlers for inspecting
-        // Use target player's inventory for item details
         const targetInventory = data.inventory || [];
 
         for (const [slotName, itemName] of Object.entries(data.equipment)) {
           if (!itemName) continue;
 
-          // Skip body and head - these are sprite sheet template names, not UI equipment slots
           if (slotName === 'body' || slotName === 'head') continue;
 
           const slotElement = document.querySelector(`.slot[data-slot="${slotName}"]`) as HTMLDivElement;
           if (!slotElement) continue;
 
-          // Get item details from target player's inventory
           const itemDetails = targetInventory.find((item: any) => item.name === itemName);
 
           if (itemDetails && itemDetails.icon) {
@@ -2277,47 +2142,34 @@ socket.onmessage = async (event) => {
               slotElement.classList.remove("empty");
             }
 
-            // @ts-expect-error - pako is loaded in index.html
+            //@ts-expect-error - Imported via HTML
             const inflatedData = pako.inflate(
               new Uint8Array(itemDetails.icon.data),
               { to: "string" }
             );
             const iconSrc = `data:image/png;base64,${inflatedData}`;
 
-            // Use cached image to prevent flickering (synchronous for base64)
             const iconImage = createCachedImage(iconSrc);
             iconImage.draggable = false;
             iconImage.width = 32;
             iconImage.height = 32;
             slotElement.appendChild(iconImage);
 
-            // Setup tooltip for inspected player's equipment
             setupItemTooltip(slotElement, () => itemDetails);
           } else {
-            // If no icon, just show item name
+
             slotElement.innerHTML = String(itemName);
             slotElement.classList.remove("empty");
 
-            // Setup tooltip for inspected player's equipment
             setupItemTooltip(slotElement, () => itemDetails);
           }
         }
       } else if (data.id === cachedPlayerId) {
-        // Inspecting YOURSELF - ensure your equipment is visible with event handlers intact
-        // If stat sheet was previously showing another player's equipment, we need to restore yours
-        // The EQUIPMENT packet handler has already set up your equipment with proper event handlers
-        // We just need to ensure it's visible (don't touch the slots to preserve handlers)
 
-        // If we were showing another player's equipment before, we need to restore yours
         if (previousShownId && previousShownId !== cachedPlayerId) {
-          // Your equipment should be in cache.equipment from the EQUIPMENT packet
-          // We need to repopulate the slots while preserving event handlers
-          // The safest way is to trigger the EQUIPMENT packet logic again
 
-          // But we can't easily trigger a packet, so instead we'll manually restore
-          // by clearing and repopulating with your cached equipment
           if (cache.equipment) {
-            // Clear all slots first but DON'T clone/replace (preserve structure for next EQUIPMENT packet)
+
             const allSlots = [
               ...equipmentLeftColumn.querySelectorAll(".slot"),
               ...equipmentRightColumn.querySelectorAll(".slot"),
@@ -2325,14 +2177,12 @@ socket.onmessage = async (event) => {
             ];
 
             allSlots.forEach((slot) => {
-              // Remove tooltip event listeners before clearing
+
               removeItemTooltip(slot as HTMLElement);
 
-              // Clear content but keep the slot element itself
               slot.innerHTML = "";
               slot.className = "slot empty ui";
 
-              // Remove all custom properties except data-slot
               Array.from(slot.attributes).forEach(attr => {
                 if (attr.name !== "data-slot" && attr.name !== "class") {
                   slot.removeAttribute(attr.name);
@@ -2340,44 +2190,37 @@ socket.onmessage = async (event) => {
               });
             });
 
-            // Now repopulate with your equipment and restore event handlers
-            // This is essentially duplicating the EQUIPMENT packet logic
             setupEquipmentSlotHandlers();
 
-            // Populate equipment slots with your equipped items
             for (const [slotName, itemName] of Object.entries(cache.equipment)) {
               if (!itemName) continue;
 
-              // Skip body and head - these are sprite sheet template names, not UI equipment slots
               if (slotName === 'body' || slotName === 'head') continue;
 
               const slotElement = document.querySelector(`.slot[data-slot="${slotName}"]`) as HTMLDivElement;
               if (!slotElement) continue;
 
-              // Get item details from your inventory cache
               const inventoryData = cache.inventory || [];
               const itemDetails = inventoryData.find((item: any) => item.name === itemName);
 
               if (itemDetails && itemDetails.icon) {
-                // Remove empty class and add quality class
+
                 if (itemDetails.quality) {
                   slotElement.classList.add(itemDetails.quality.toLowerCase());
                   slotElement.classList.remove("empty");
                 }
 
-                // @ts-expect-error - pako is loaded in index.html
+                //@ts-expect-error - Imported via HTML
                 const inflatedData = pako.inflate(
                   new Uint8Array(itemDetails.icon.data),
                   { to: "string" }
                 );
                 const iconSrc = `data:image/png;base64,${inflatedData}`;
 
-                // Add event listeners for unequipping
                 slotElement.ondblclick = () => {
-                  // Hide tooltip when unequipping
+
                   hideItemTooltip();
 
-                  // Find first empty inventory slot
                   const inventorySlots = inventoryGrid.querySelectorAll(".slot");
                   let firstEmptySlot = -1;
                   inventorySlots.forEach((invSlot, idx) => {
@@ -2393,7 +2236,7 @@ socket.onmessage = async (event) => {
                 };
 
                 slotElement.ondragstart = (event: DragEvent) => {
-                  // Hide tooltip when starting to drag
+
                   hideItemTooltip();
 
                   if (event.dataTransfer) {
@@ -2408,11 +2251,9 @@ socket.onmessage = async (event) => {
                   slotElement.style.opacity = "1";
                 };
 
-                // Make equipped item draggable
                 slotElement.draggable = true;
                 slotElement.dataset.equippedItem = String(itemName);
 
-                // Add the image
                 const iconImage = new Image();
                 iconImage.draggable = false;
                 iconImage.width = 32;
@@ -2423,19 +2264,16 @@ socket.onmessage = async (event) => {
                 };
                 iconImage.src = iconSrc;
 
-                // Setup tooltip for equipped item
                 setupItemTooltip(slotElement, () => itemDetails);
               } else {
-                // If no icon, just show item name
+
                 slotElement.innerHTML = String(itemName);
                 slotElement.classList.remove("empty");
 
-                // Add double-click to unequip
                 slotElement.addEventListener("dblclick", () => {
-                  // Hide tooltip when unequipping
+
                   hideItemTooltip();
 
-                  // Find first empty inventory slot
                   const inventorySlots = inventoryGrid.querySelectorAll(".slot");
                   let firstEmptySlot = -1;
                   inventorySlots.forEach((invSlot, idx) => {
@@ -2450,12 +2288,11 @@ socket.onmessage = async (event) => {
                   });
                 });
 
-                // Make equipped item draggable for unequipping
                 slotElement.draggable = true;
                 slotElement.dataset.equippedItem = String(itemName);
 
                 slotElement.addEventListener("dragstart", (event: DragEvent) => {
-                  // Hide tooltip when starting to drag
+
                   hideItemTooltip();
 
                   if (event.dataTransfer) {
@@ -2470,17 +2307,14 @@ socket.onmessage = async (event) => {
                   slotElement.style.opacity = "1";
                 });
 
-                // Setup tooltip for equipped item
                 setupItemTooltip(slotElement, () => itemDetails);
               }
             }
           }
         }
-        // If we're already showing your equipment (previousShownId === cachedPlayerId),
-        // don't touch anything - your equipment is already visible with event handlers intact
+
       }
 
-      // Update the data-id attribute AFTER all equipment logic
       statUI.setAttribute("data-id", data.id);
 
       statUI.style.transition = "1s";
@@ -2494,42 +2328,40 @@ socket.onmessage = async (event) => {
     }
     case "WHISPER": {
       const data = JSON.parse(packet.decode(event.data))["data"];
-      // Escape HTML tags before setting chat message
+
       const escapedMessage = data.message
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
       const timestamp = new Date().toLocaleTimeString();
-      // Update chat box
+
       if (data.message?.trim() !== "" && data.username) {
         const message = document.createElement("div");
         message.classList.add("message");
         message.classList.add("ui");
         message.style.userSelect = "text";
-        // Username with first letter uppercase
+
         const username =
           data?.username?.charAt(0)?.toUpperCase() + data?.username?.slice(1);
         message.innerHTML = `<span>${timestamp} <span class="whisper-username">${username}:</span> <span class="whisper-message">${escapedMessage}</span></span>`;
         chatMessages.appendChild(message);
-        // Scroll to the bottom of the chat messages
+
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
       break;
     }
     case "PARTY_CHAT": {
       const data = JSON.parse(packet.decode(event.data))["data"];
-      // Escape HTML tags before setting chat message
+
       const escapedMessage = data.message
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
       const timestamp = new Date().toLocaleTimeString();
 
-      // Set overhead chat for party members
       cache.players.forEach((player) => {
         if (player.id === data.id) {
           player.chat = data.message;
           player.chatType = "party";
 
-          // Set timeout to clear party chat
           setTimeout(() => {
             const currentPlayer = Array.from(cache.players).find(p => p.id === data.id);
             if (currentPlayer?.chat === data.message && currentPlayer?.chatType === "party") {
@@ -2540,18 +2372,17 @@ socket.onmessage = async (event) => {
         }
       });
 
-      // Update chat box
       if (data.message?.trim() !== "" && data.username) {
         const message = document.createElement("div");
         message.classList.add("message");
         message.classList.add("ui");
         message.style.userSelect = "text";
-        // Username with first letter uppercase
+
         const username =
           data?.username?.charAt(0)?.toUpperCase() + data?.username?.slice(1);
         message.innerHTML = `<span>${timestamp} <span class="party-username">${username}:</span> <span class="party-message">${escapedMessage}</span></span>`;
         chatMessages.appendChild(message);
-        // Scroll to the bottom of the chat messages
+
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
       break;
@@ -2561,7 +2392,6 @@ socket.onmessage = async (event) => {
 
       if (!cachedPlayerId) break;
 
-      // Update currency in player cache
       const currentPlayer = Array.from(cache.players).find(
         (p) => p.id === cachedPlayerId
       );
@@ -2573,14 +2403,12 @@ socket.onmessage = async (event) => {
         };
       }
 
-      // Update currency display
       updateCurrencyDisplay();
       break;
     }
     case "MAP_CHUNK": {
-      // Resolve pending map chunk request
+
       if (data.error) {
-        console.error(`Map chunk error: ${data.error}`);
         const chunkKey = pendingMapChunkRequests.keys().next().value;
         if (chunkKey) {
           const resolver = pendingMapChunkRequests.get(chunkKey);
@@ -2601,9 +2429,8 @@ socket.onmessage = async (event) => {
       break;
     }
     case "TILESET": {
-      // Handle errors
+
       if (data.error) {
-        console.error(`Tileset error: ${data.error}`);
         const name = pendingTilesetRequests.keys().next().value;
         if (name) {
           const resolver = pendingTilesetRequests.get(name);
@@ -2616,11 +2443,9 @@ socket.onmessage = async (event) => {
         break;
       }
 
-      // Handle chunked streaming
       if (data.chunkIndex !== undefined) {
         const tilesetName = data.name;
 
-        // Metadata packet (chunkIndex === -1)
         if (data.chunkIndex === -1) {
           tilesetChunks.set(tilesetName, {
             chunks: new Array(data.totalChunks),
@@ -2628,13 +2453,12 @@ socket.onmessage = async (event) => {
             received: 0
           });
         } else {
-          // Data chunk
+
           const state = tilesetChunks.get(tilesetName);
           if (state) {
             state.chunks[data.chunkIndex] = data.data;
             state.received++;
 
-            // All chunks received - reassemble
             if (state.received === state.totalChunks) {
               const completeData = state.chunks.join('');
               const resolver = pendingTilesetRequests.get(tilesetName);
@@ -2647,7 +2471,7 @@ socket.onmessage = async (event) => {
           }
         }
       } else if (data.tileset) {
-        // Legacy non-chunked response (for backward compatibility)
+
         const resolver = pendingTilesetRequests.get(data.tileset.name);
         if (resolver) {
           resolver.resolve(data.tileset);
@@ -2661,7 +2485,6 @@ socket.onmessage = async (event) => {
   }
 };
 
-// Create text on bottom right that displays the version at half opacity
 if (version) {
   const versionText = document.createElement("div");
   versionText.style.position = "fixed";
@@ -2685,33 +2508,33 @@ function showNotification(
   notificationMessage.innerText = message;
   notificationContainer.style.display = "flex";
 
-  const baseTimeout = 5000; // Base timeout of 5 seconds
-  const timePerChar = 100; // Additional time per character in milliseconds
+  const baseTimeout = 5000;
+  const timePerChar = 100;
   const timeout = baseTimeout + message.length * timePerChar;
 
   if (autoClose) {
-    // Clear any existing timeout
+
     if (clearNotificationTimeout) {
       clearTimeout(clearNotificationTimeout);
     }
     clearNotificationTimeout = setTimeout(() => {
       if (!notificationContainer || !notificationMessage) return;
       notificationContainer.style.display = "none";
-      // If reconnect is true, redirect after hiding notification
+
       if (reconnect) {
         if (window.navigator.userAgent === "@Electron/Frostfire-Forge-Client") {
-          window.close(); // Close the Electron window
+          window.close();
         } else {
-          // If not in Electron, redirect to home page
+
           window.location.href = "/";
         }
       }
     }, timeout);
   } else if (reconnect) {
-    // If not auto-closing but need to reconnect
+
     setTimeout(() => {
       if (window.navigator.userAgent === "@Electron/Frostfire-Forge-Client") {
-        window.close(); // Close the Electron window
+        window.close();
       } else {
         window.location.href = "/";
       }
@@ -2719,7 +2542,7 @@ function showNotification(
   }
 }
 
-} // End of setupSocketHandlers()
+}
 
 let loaded: boolean = false;
 export let selfPlayerSpriteLoaded: boolean = false;
@@ -2727,7 +2550,6 @@ export let selfPlayerSpriteLoaded: boolean = false;
 export function setSelfPlayerSpriteLoaded(value: boolean) {
   selfPlayerSpriteLoaded = value;
 
-  // Check if we should hide loading screen now
   if (value && loaded) {
     hideLoadingScreen();
   }
@@ -2754,8 +2576,7 @@ function getIsLoaded() {
 }
 
 async function isLoaded() {
-  // Just wait for map to be loaded
-  // Loading screen hiding is now handled separately by hideLoadingScreen()
+
   await new Promise<void>((resolve) => {
     const interval = setInterval(() => {
       if (loaded) {
@@ -2766,7 +2587,6 @@ async function isLoaded() {
   });
 }
 
-// Initialize socket connection (via gateway or direct)
 initializeSocket();
 
 setInterval(() => {
@@ -2780,7 +2600,6 @@ setInterval(() => {
   receivedResponses = 0;
 }, 1000);
 
-// Utility IndexedDB wrapper
 async function openAnimationDB() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open("AnimationCache", 1);
@@ -2821,10 +2640,8 @@ async function saveAnimationToDB(name: string, data: Uint8Array) {
   });
 }
 
-// Initialize equipment slot handlers when the page loads
 setupEquipmentSlotHandlers();
 
-// Expose socket module for map chunk requests
 (window as any).__socketModule = {
   sendRequest,
   pendingMapChunkRequests

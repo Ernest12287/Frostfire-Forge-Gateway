@@ -1,9 +1,4 @@
-/**
- * Animation Metadata Tool
- * Complete animation editor with frame-by-frame timeline control
- */
 
-// ===== TYPE DECLARATIONS =====
 
 declare global {
   interface Window {
@@ -26,8 +21,6 @@ declare global {
     close(): Promise<void>;
   }
 }
-
-// ===== INTERFACES =====
 
 interface AnimationMetadata {
   name: string;
@@ -71,24 +64,19 @@ interface SplitFrame {
   height: number;
 }
 
-// ===== MAIN CLASS =====
-
 class AnimatorTool {
-  // Metadata
+
   private metadata: AnimationMetadata;
   private currentImage: HTMLImageElement | null = null;
   private currentImageDataURL: string | null = null;
 
-  // Split frames (from spritesheet)
   private splitFrames: SplitFrame[] = [];
 
-  // Canvas elements
   private previewCanvas: HTMLCanvasElement;
   private previewCtx: CanvasRenderingContext2D;
   private gridCanvas: HTMLCanvasElement;
   private gridCtx: CanvasRenderingContext2D;
 
-  // Grid state
   private gridZoom: number = 3;
   private readonly minZoom: number = 1;
   private readonly maxZoom: number = 3;
@@ -97,40 +85,33 @@ class AnimatorTool {
   private gridCellSize: number = 64;
   private readonly maxCoordinateDistance: number = 500;
 
-  // Drag state (for grid canvas)
   private isDraggingFrame: boolean = false;
   private draggedFrameIndex: number | null = null;
   private dragOffsetX: number = 0;
   private dragOffsetY: number = 0;
 
-  // Drag state (for timeline reordering)
   private draggedTimelineElement: HTMLElement | null = null;
   private draggedTimelineIndex: number = -1;
   private dragOverTargetIndex: number = -1;
   private dragOverMouseSide: 'before' | 'after' = 'before';
 
-  // Playback state
   private isPlaying: boolean = false;
   private playbackFrame: number = 0;
   private playbackStartTime: number = 0;
   private playbackAnimationId: number | null = null;
 
-  // Autosave
   private autosaveEnabled: boolean = false;
   private autosaveKey: string = 'animator_autosave';
   private isRestoringAutosave: boolean = false;
 
-  // Current selection
   private selectedAnimation: string = '';
   private selectedDirection: string = '';
   private selectedTimelineFrame: number | null = null;
   private editingAnimationName: string | null = null;
 
-  // Modal keyboard handlers
   private animationModalKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private directionModalKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
-  // Undo/Redo state
   private undoStack: Array<{
     type: 'frames' | 'coords' | 'duration';
     animation: string;
@@ -150,17 +131,14 @@ class AnimatorTool {
   constructor() {
     this.metadata = this.createEmptyMetadata();
 
-    // Get canvas elements
     this.previewCanvas = document.getElementById('spritesheet-preview-canvas') as HTMLCanvasElement;
     this.previewCtx = this.previewCanvas.getContext('2d')!;
     this.gridCanvas = document.getElementById('timeline-grid-canvas') as HTMLCanvasElement;
     this.gridCtx = this.gridCanvas.getContext('2d')!;
 
-    // Disable image smoothing for crisp pixel art
     this.previewCtx.imageSmoothingEnabled = false;
     this.gridCtx.imageSmoothingEnabled = false;
 
-    // Initialize grid canvas size (will be dynamically sized by CSS)
     const container = this.gridCanvas.parentElement;
     if (container) {
       this.gridCanvas.width = container.clientWidth || 800;
@@ -170,7 +148,6 @@ class AnimatorTool {
       this.gridCanvas.height = 600;
     }
 
-    // Check if autosave exists before initializing UI
     const hasAutosave = localStorage.getItem(this.autosaveKey) !== null;
     if (hasAutosave) {
       this.isRestoringAutosave = true;
@@ -183,22 +160,18 @@ class AnimatorTool {
   }
 
   private initializeUI(): void {
-    // Hide preview canvas initially
+
     this.previewCanvas.style.display = 'none';
 
-    // Disable export button initially
     const exportBtn = document.getElementById('export-json-btn') as HTMLButtonElement;
     if (exportBtn) exportBtn.disabled = true;
 
-    // Hide direction select initially
     const directionContainer = document.getElementById('direction-select-container');
     if (directionContainer) directionContainer.style.display = 'none';
 
-    // Update animation and direction selects to reflect empty state
     this.updateAnimationSelect();
     this.updateDirectionSelect();
 
-    // Render initial states with placeholders
     this.renderFramesGrid();
     this.renderTimelineSequence();
     this.renderGridCanvas();
@@ -221,7 +194,7 @@ class AnimatorTool {
   }
 
   private clampAllFrameDurations(): void {
-    // Iterate through all animations and directions to clamp frame durations
+
     let clamped = false;
     for (const animName in this.metadata.animations) {
       const animation = this.metadata.animations[animName];
@@ -229,7 +202,7 @@ class AnimatorTool {
         const direction = animation.directions[dirName];
         for (const frame of direction.frames) {
           const originalDuration = frame.duration;
-          // Clamp duration between 10ms and 10000ms (10 seconds)
+
           frame.duration = Math.max(10, Math.min(10000, frame.duration));
           if (frame.duration !== originalDuration) {
             clamped = true;
@@ -238,7 +211,6 @@ class AnimatorTool {
       }
     }
 
-    // If any durations were clamped, update the UI and trigger autosave
     if (clamped) {
       this.renderTimelineSequence();
       this.renderTimelineScrubber();
@@ -246,12 +218,10 @@ class AnimatorTool {
     }
   }
 
-  // This will be expanded in subsequent features
   private initializeEventListeners(): void {
-    // Load image button (in placeholder)
+
     document.getElementById('load-image-btn-alt')?.addEventListener('click', () => this.loadImage());
 
-    // Frame width/height inputs
     document.getElementById('frame-width')?.addEventListener('input', (e) => {
       this.metadata.frameWidth = parseInt((e.target as HTMLInputElement).value) || 64;
       this.drawSpritesheetPreview();
@@ -263,7 +233,6 @@ class AnimatorTool {
       this.triggerAutosave();
     });
 
-    // Columns/rows inputs
     document.getElementById('columns')?.addEventListener('input', (e) => {
       this.metadata.columns = parseInt((e.target as HTMLInputElement).value) || 0;
       this.drawSpritesheetPreview();
@@ -275,28 +244,24 @@ class AnimatorTool {
       this.triggerAutosave();
     });
 
-    // Split frames button
     document.getElementById('split-frames-btn')?.addEventListener('click', () => this.splitFramesFromImage());
 
-    // Autosave checkbox
     document.getElementById('autosave-checkbox')?.addEventListener('change', (e) => {
       this.autosaveEnabled = (e.target as HTMLInputElement).checked;
       if (this.autosaveEnabled) {
         this.performAutosave();
         this.showNotification('Autosave enabled', 'success');
       } else {
-        // Clear autosave when disabled
+
         localStorage.removeItem(this.autosaveKey);
         this.showNotification('Autosave disabled and cleared', 'success');
       }
     });
 
-    // New/Import/Export buttons
     document.getElementById('new-metadata-btn')?.addEventListener('click', () => this.newMetadata());
     document.getElementById('import-json-input')?.addEventListener('change', async (e) => await this.importJSON(e));
     document.getElementById('export-json-btn')?.addEventListener('click', () => this.exportJSON());
 
-    // Metadata inputs
     document.getElementById('metadata-name')?.addEventListener('input', (e) => {
       this.metadata.name = (e.target as HTMLInputElement).value;
       this.triggerAutosave();
@@ -306,7 +271,6 @@ class AnimatorTool {
       this.triggerAutosave();
     });
 
-    // Animation management
     document.getElementById('add-animation-btn')?.addEventListener('click', () => this.showAnimationModal());
     document.getElementById('edit-animation-btn')?.addEventListener('click', () => this.editCurrentAnimation());
     document.getElementById('delete-animation-btn')?.addEventListener('click', () => this.deleteCurrentAnimation());
@@ -316,52 +280,47 @@ class AnimatorTool {
       this.onAnimationChange();
     });
 
-    // Direction management
     document.getElementById('add-direction-btn')?.addEventListener('click', () => this.showDirectionModal());
     document.getElementById('edit-direction-btn')?.addEventListener('click', () => this.editCurrentDirection());
     document.getElementById('delete-direction-btn')?.addEventListener('click', () => this.deleteCurrentDirection());
     document.getElementById('direction-select')?.addEventListener('change', (e) => {
       if (this.isRestoringAutosave) return;
       const newDirection = (e.target as HTMLSelectElement).value;
-      // Only call onDirectionChange if direction actually changed
+
       if (newDirection !== this.selectedDirection) {
         this.selectedDirection = newDirection;
         this.onDirectionChange();
       }
     });
 
-    // Timeline controls
     document.getElementById('clear-timeline-btn')?.addEventListener('click', () => this.clearTimeline());
     document.getElementById('reset-position-btn')?.addEventListener('click', () => this.resetAllFramePositions());
 
-    // Frame sequence container (for drag & drop)
     const frameSeqContainer = document.getElementById('frame-sequence-list');
     if (frameSeqContainer) {
       frameSeqContainer.addEventListener('dragover', (e) => {
         e.preventDefault();
-        // Check if it's a reorder operation or adding a new frame
+
         const isReorder = e.dataTransfer!.types.includes('timeline-reorder');
         e.dataTransfer!.dropEffect = isReorder ? 'move' : 'copy';
       });
       frameSeqContainer.addEventListener('drop', (e) => {
-        // Check if this is a timeline reorder operation
+
         const reorderData = e.dataTransfer!.getData('timeline-reorder');
 
         if (reorderData) {
-          // Handle reordering at container level since drop events fire here
+
           e.preventDefault();
 
           const fromIndex = parseInt(reorderData);
           if (isNaN(fromIndex)) return;
 
-          // Use the target info stored during dragover
           if (this.dragOverTargetIndex === -1) return;
 
           const targetIndex = this.dragOverTargetIndex;
           const direction = this.getCurrentDirection();
           if (!direction) return;
 
-          // Calculate drop position based on stored dragover info
           let toIndex = targetIndex;
           if (this.dragOverMouseSide === 'after') {
             toIndex = targetIndex + 1;
@@ -376,7 +335,6 @@ class AnimatorTool {
             const [movedFrame] = direction.frames.splice(fromIndex, 1);
             direction.frames.splice(toIndex, 0, movedFrame);
 
-            // Adjust selected frame index
             if (this.selectedTimelineFrame === fromIndex) {
               this.selectedTimelineFrame = toIndex;
             } else if (fromIndex < this.selectedTimelineFrame! && toIndex >= this.selectedTimelineFrame!) {
@@ -395,7 +353,6 @@ class AnimatorTool {
           return;
         }
 
-        // Not a reorder - handle adding frame from grid
         e.preventDefault();
         const frameIndex = parseInt(e.dataTransfer!.getData('frameIndex'));
         if (!isNaN(frameIndex)) {
@@ -404,7 +361,6 @@ class AnimatorTool {
       });
     }
 
-    // Timeline grid container (for drag & drop)
     const timelineGridContainer = document.getElementById('timeline-grid-container');
     if (timelineGridContainer) {
       timelineGridContainer.addEventListener('dragover', (e) => {
@@ -420,24 +376,20 @@ class AnimatorTool {
       });
     }
 
-    // Modal close buttons
     document.querySelectorAll('.modal-close').forEach((btn) => {
       btn.addEventListener('click', () => this.closeAllModals());
     });
 
-    // Animation modal save
     document.getElementById('save-animation-btn')?.addEventListener('click', () => this.saveAnimation());
 
-    // Direction modal save
     document.getElementById('save-direction-btn')?.addEventListener('click', () => this.saveDirection());
 
-    // Grid canvas zoom and pan
     this.gridCanvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomSpeed = 0.1;
       const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
       this.gridZoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.gridZoom + delta));
-      // Reset pan to keep everything centered
+
       this.gridPanX = 0;
       this.gridPanY = 0;
       this.renderGridCanvas();
@@ -452,11 +404,10 @@ class AnimatorTool {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      if (e.button === 0 && !e.shiftKey) { // Left mouse for dragging frames
-        // Disable interactions during playback
+      if (e.button === 0 && !e.shiftKey) {
+
         if (this.isPlaying) return;
 
-        // Check if clicking on coordinate label first
         if (this.isClickOnCoordinateLabel(mouseX, mouseY)) {
           this.editCoordinates();
           e.preventDefault();
@@ -472,7 +423,6 @@ class AnimatorTool {
           if (direction) {
             const frame = direction.frames[frameIndex];
 
-            // Save state for undo before dragging starts
             this.pushUndoState('coords', {
               x: frame.x,
               y: frame.y,
@@ -496,7 +446,7 @@ class AnimatorTool {
         }
       }
 
-      if (e.button === 0 && e.shiftKey) { // Shift+Left mouse for panning
+      if (e.button === 0 && e.shiftKey) {
         isPanning = true;
         lastPanX = e.clientX;
         lastPanY = e.clientY;
@@ -518,19 +468,15 @@ class AnimatorTool {
           const scaledWidth = this.metadata.frameWidth * this.gridZoom;
           const scaledHeight = this.metadata.frameHeight * this.gridZoom;
 
-          // Calculate new frame position from mouse
           const frameX = mouseX - this.dragOffsetX;
           const frameY = mouseY - this.dragOffsetY;
 
-          // Convert to grid coordinates (centered)
           let newTotalX = (frameX - centerX + scaledWidth / 2) / this.gridZoom;
           let newTotalY = (frameY - centerY + scaledHeight / 2) / this.gridZoom;
 
-          // Clamp to max distance from center
           newTotalX = Math.max(-this.maxCoordinateDistance, Math.min(this.maxCoordinateDistance, newTotalX));
           newTotalY = Math.max(-this.maxCoordinateDistance, Math.min(this.maxCoordinateDistance, newTotalY));
 
-          // Update x, y (keeping offsetX, offsetY constant) and round to whole numbers
           frame.x = Math.round(newTotalX - frame.offsetX);
           frame.y = Math.round(newTotalY - frame.offsetY);
 
@@ -547,11 +493,11 @@ class AnimatorTool {
         this.renderGridCanvas();
         this.gridCanvas.style.cursor = 'grabbing';
       } else {
-        // Check if hovering over coordinate label
+
         if (this.isClickOnCoordinateLabel(mouseX, mouseY)) {
           this.gridCanvas.style.cursor = 'pointer';
         } else {
-          // Check if hovering over a frame
+
           const frameIndex = this.getFrameAtPosition(mouseX, mouseY);
           this.gridCanvas.style.cursor = frameIndex !== null ? 'grab' : 'default';
         }
@@ -570,7 +516,6 @@ class AnimatorTool {
         this.isDraggingFrame = false;
         this.draggedFrameIndex = null;
 
-        // Update cursor based on what's under mouse
         const rect = this.gridCanvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -590,31 +535,28 @@ class AnimatorTool {
       this.gridCanvas.style.cursor = 'default';
     });
 
-    // Playback controls
     document.getElementById('play-pause-btn')?.addEventListener('click', () => this.togglePlayPause());
     document.getElementById('stop-btn')?.addEventListener('click', () => this.stopPlayback());
 
-    // Handle window resize to update canvas size
     window.addEventListener('resize', () => this.handleResize());
 
-    // Keyboard shortcuts for undo/redo, arrow keys, tab, and delete
     window.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-        // Don't allow undo when a modal is open
+
         if (this.isModalOpen()) {
           return;
         }
         e.preventDefault();
         this.undo();
       } else if (e.ctrlKey && e.key === 'y') {
-        // Don't allow redo when a modal is open
+
         if (this.isModalOpen()) {
           return;
         }
         e.preventDefault();
         this.redo();
       } else if (e.key === 'Tab') {
-        // Only handle tab when not in an input field
+
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
           return;
@@ -622,24 +564,24 @@ class AnimatorTool {
         e.preventDefault();
         this.cycleFrame(e.shiftKey ? -1 : 1);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Only handle delete/backspace when not in an input field
+
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
           return;
         }
-        // Don't allow deleting frames when a modal is open
+
         if (this.isModalOpen()) {
           return;
         }
         e.preventDefault();
         this.deleteSelectedFrame();
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        // Only handle arrow keys when not in an input field
+
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
           return;
         }
-        // Don't allow moving frames when a modal is open
+
         if (this.isModalOpen()) {
           return;
         }
@@ -664,7 +606,7 @@ class AnimatorTool {
   }
 
   private handleArrowKey(key: string): void {
-    // Don't allow moving during playback
+
     if (this.isPlaying) return;
 
     const direction = this.getCurrentDirection();
@@ -673,7 +615,6 @@ class AnimatorTool {
     const timelineFrame = direction.frames[this.selectedTimelineFrame];
     if (!timelineFrame) return;
 
-    // Save state for undo before moving
     this.pushUndoState('coords', {
       x: timelineFrame.x,
       y: timelineFrame.y,
@@ -681,7 +622,6 @@ class AnimatorTool {
       offsetY: timelineFrame.offsetY
     }, this.selectedTimelineFrame);
 
-    // Move by 1 pixel in the specified direction
     switch (key) {
       case 'ArrowUp':
         timelineFrame.y = Math.max(-this.maxCoordinateDistance, timelineFrame.y - 1);
@@ -702,7 +642,7 @@ class AnimatorTool {
   }
 
   private cycleFrame(direction: number): void {
-    // Don't allow cycling during playback
+
     if (this.isPlaying) return;
 
     const currentDirection = this.getCurrentDirection();
@@ -710,18 +650,17 @@ class AnimatorTool {
 
     const frameCount = currentDirection.frames.length;
 
-    // If no frame selected, select the first one
     if (this.selectedTimelineFrame === null) {
       this.selectedTimelineFrame = 0;
     } else {
-      // Cycle to next/previous frame with wrapping
+
       this.selectedTimelineFrame += direction;
 
       if (this.selectedTimelineFrame < 0) {
-        // Wrap to last frame when going backwards from first
+
         this.selectedTimelineFrame = frameCount - 1;
       } else if (this.selectedTimelineFrame >= frameCount) {
-        // Wrap to first frame when going forward from last
+
         this.selectedTimelineFrame = 0;
       }
     }
@@ -734,25 +673,21 @@ class AnimatorTool {
   }
 
   private deleteSelectedFrame(): void {
-    // Don't allow deleting during playback
+
     if (this.isPlaying) return;
 
     const direction = this.getCurrentDirection();
     if (!direction || this.selectedTimelineFrame === null) return;
 
-    // Save state for undo
     this.pushUndoState('frames', JSON.parse(JSON.stringify(direction.frames)));
 
-    // Delete the selected frame
     direction.frames.splice(this.selectedTimelineFrame, 1);
 
-    // Adjust selected frame index after deletion
     if (direction.frames.length === 0) {
       this.selectedTimelineFrame = null;
     } else if (this.selectedTimelineFrame >= direction.frames.length) {
       this.selectedTimelineFrame = direction.frames.length - 1;
     }
-    // If the frame was in the middle, selectedTimelineFrame stays the same (now points to next frame)
 
     this.renderTimelineSequence();
     this.renderTimelineScrubber();
@@ -764,8 +699,6 @@ class AnimatorTool {
     this.triggerAutosave();
   }
 
-  // ===== UNDO/REDO =====
-
   private pushUndoState(type: 'frames' | 'coords' | 'duration', data: any, frameIndex?: number): void {
     if (!this.selectedAnimation || !this.selectedDirection) return;
 
@@ -774,15 +707,13 @@ class AnimatorTool {
       animation: this.selectedAnimation,
       direction: this.selectedDirection,
       frameIndex,
-      data: JSON.parse(JSON.stringify(data)) // Deep copy
+      data: JSON.parse(JSON.stringify(data))
     });
 
-    // Limit stack size
     if (this.undoStack.length > this.maxUndoStackSize) {
       this.undoStack.shift();
     }
 
-    // Clear redo stack when new action is performed
     this.redoStack = [];
   }
 
@@ -793,18 +724,14 @@ class AnimatorTool {
 
     const state = this.undoStack.pop()!;
 
-    // Only allow undo if we're in the same animation/direction
     if (state.animation !== this.selectedAnimation || state.direction !== this.selectedDirection) {
-      this.undoStack.push(state); // Put it back
+      this.undoStack.push(state);
       return;
     }
-
-    // Coords and duration can be undone regardless of selected frame - will auto-select the frame
 
     const direction = this.getCurrentDirection();
     if (!direction) return;
 
-    // Save current state to redo stack
     if (state.type === 'frames') {
       this.redoStack.push({
         type: 'frames',
@@ -813,7 +740,6 @@ class AnimatorTool {
         data: JSON.parse(JSON.stringify(direction.frames))
       });
 
-      // Restore frames state
       direction.frames = state.data;
     } else if (state.type === 'coords' && state.frameIndex !== undefined) {
       const frame = direction.frames[state.frameIndex];
@@ -826,13 +752,11 @@ class AnimatorTool {
           data: { x: frame.x, y: frame.y, offsetX: frame.offsetX, offsetY: frame.offsetY }
         });
 
-        // Restore coords state
         frame.x = state.data.x;
         frame.y = state.data.y;
         frame.offsetX = state.data.offsetX;
         frame.offsetY = state.data.offsetY;
 
-        // Select the frame that was modified
         this.selectedTimelineFrame = state.frameIndex;
       }
     } else if (state.type === 'duration' && state.frameIndex !== undefined) {
@@ -846,10 +770,8 @@ class AnimatorTool {
           data: frame.duration
         });
 
-        // Restore duration state
         frame.duration = state.data;
 
-        // Select the frame that was modified
         this.selectedTimelineFrame = state.frameIndex;
       }
     }
@@ -871,18 +793,14 @@ class AnimatorTool {
 
     const state = this.redoStack.pop()!;
 
-    // Only allow redo if we're in the same animation/direction
     if (state.animation !== this.selectedAnimation || state.direction !== this.selectedDirection) {
-      this.redoStack.push(state); // Put it back
+      this.redoStack.push(state);
       return;
     }
-
-    // Coords and duration can be redone regardless of selected frame - will auto-select the frame
 
     const direction = this.getCurrentDirection();
     if (!direction) return;
 
-    // Save current state to undo stack
     if (state.type === 'frames') {
       this.undoStack.push({
         type: 'frames',
@@ -891,7 +809,6 @@ class AnimatorTool {
         data: JSON.parse(JSON.stringify(direction.frames))
       });
 
-      // Restore frames state
       direction.frames = state.data;
     } else if (state.type === 'coords' && state.frameIndex !== undefined) {
       const frame = direction.frames[state.frameIndex];
@@ -904,13 +821,11 @@ class AnimatorTool {
           data: { x: frame.x, y: frame.y, offsetX: frame.offsetX, offsetY: frame.offsetY }
         });
 
-        // Restore coords state
         frame.x = state.data.x;
         frame.y = state.data.y;
         frame.offsetX = state.data.offsetX;
         frame.offsetY = state.data.offsetY;
 
-        // Select the frame that was modified
         this.selectedTimelineFrame = state.frameIndex;
       }
     } else if (state.type === 'duration' && state.frameIndex !== undefined) {
@@ -924,10 +839,8 @@ class AnimatorTool {
           data: frame.duration
         });
 
-        // Restore duration state
         frame.duration = state.data;
 
-        // Select the frame that was modified
         this.selectedTimelineFrame = state.frameIndex;
       }
     }
@@ -941,8 +854,6 @@ class AnimatorTool {
     this.updatePlaybackDisplay();
     this.triggerAutosave();
   }
-
-  // ===== AUTOSAVE/RESTORE =====
 
   private restoreAutosave(): void {
     const saved = localStorage.getItem(this.autosaveKey);
@@ -959,15 +870,13 @@ class AnimatorTool {
       this.gridPanX = data.gridPanX || 0;
       this.gridPanY = data.gridPanY || 0;
 
-      // Restore saved selections
       this.selectedAnimation = data.selectedAnimation || '';
       this.selectedDirection = data.selectedDirection || '';
       this.selectedTimelineFrame = data.selectedTimelineFrame !== undefined ? data.selectedTimelineFrame : null;
 
-      // Validate that saved selections still exist, fallback to first available if not
       if (this.selectedAnimation) {
         if (!this.metadata.animations[this.selectedAnimation]) {
-          // Animation no longer exists, fallback to first
+
           const animationNames = Object.keys(this.metadata.animations);
           this.selectedAnimation = animationNames.length > 0 ? animationNames[0] : '';
           this.selectedDirection = '';
@@ -978,7 +887,7 @@ class AnimatorTool {
       if (this.selectedAnimation && this.selectedDirection) {
         const directions = this.metadata.animations[this.selectedAnimation]?.directions;
         if (!directions || !directions[this.selectedDirection]) {
-          // Direction no longer exists, fallback to first
+
           const directionNames = directions ? Object.keys(directions) : [];
           this.selectedDirection = directionNames.length > 0 ? directionNames[0] : '';
           this.selectedTimelineFrame = null;
@@ -988,7 +897,7 @@ class AnimatorTool {
       if (this.selectedAnimation && this.selectedDirection && this.selectedTimelineFrame !== null) {
         const direction = this.metadata.animations[this.selectedAnimation]?.directions[this.selectedDirection];
         if (!direction || !direction.frames[this.selectedTimelineFrame]) {
-          // Frame no longer exists, fallback to first or null
+
           this.selectedTimelineFrame = direction && direction.frames.length > 0 ? 0 : null;
         }
       }
@@ -1027,14 +936,12 @@ class AnimatorTool {
       this.updateTimelineButtonState();
       this.updatePlaybackDisplay();
 
-      // Enable autosave checkbox if it was enabled
       const autosaveCheckbox = document.getElementById('autosave-checkbox') as HTMLInputElement;
       if (autosaveCheckbox && data.autosaveEnabled) {
         autosaveCheckbox.checked = true;
         this.autosaveEnabled = true;
       }
 
-      // Show notification after restoration is complete
       const timestamp = data.timestamp;
       let timeText = '';
       if (timestamp) {
@@ -1062,14 +969,11 @@ class AnimatorTool {
       this.showNotification(message, 'success');
 
     } catch (error) {
-      console.error('Failed to restore autosave:', error);
       this.showNotification('Failed to restore autosave', 'error');
     } finally {
       this.isRestoringAutosave = false;
     }
   }
-
-  // ===== EXPORT/IMPORT/RESET =====
 
   private async exportJSON(): Promise<void> {
     if (!this.metadata.name) {
@@ -1077,7 +981,6 @@ class AnimatorTool {
       return;
     }
 
-    // Convert internal format to export format
     const exportMetadata: any = {
       name: this.metadata.name,
       imageSource: this.metadata.imageSource,
@@ -1088,7 +991,6 @@ class AnimatorTool {
       animations: {}
     };
 
-    // Convert TimelineFrame arrays to simple number arrays
     for (const [animName, animData] of Object.entries(this.metadata.animations)) {
       exportMetadata.animations[animName] = {
         directions: {}
@@ -1130,7 +1032,6 @@ class AnimatorTool {
         return;
       }
 
-      // Fallback to traditional download
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1149,7 +1050,6 @@ class AnimatorTool {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
-    // Stop playback if currently playing
     if (this.isPlaying) {
       this.stopPlayback();
     }
@@ -1159,7 +1059,6 @@ class AnimatorTool {
       try {
         const imported = JSON.parse(e.target?.result as string);
 
-        // Reset everything first
         this.currentImage = null;
         this.currentImageDataURL = null;
         this.splitFrames = [];
@@ -1170,12 +1069,10 @@ class AnimatorTool {
         this.gridPanX = 0;
         this.gridPanY = 0;
 
-        // Hide preview canvas and show placeholder
         this.previewCanvas.style.display = 'none';
         const placeholder = document.getElementById('spritesheet-preview-placeholder');
         if (placeholder) placeholder.style.display = 'flex';
 
-        // Convert imported format to internal format
         this.metadata = {
           name: imported.name || '',
           imageSource: imported.imageSource || '',
@@ -1186,7 +1083,6 @@ class AnimatorTool {
           animations: {}
         };
 
-        // Convert simple number arrays to TimelineFrame arrays
         for (const [animName, animData] of Object.entries(imported.animations || {})) {
           this.metadata.animations[animName] = {
             directions: {}
@@ -1197,7 +1093,6 @@ class AnimatorTool {
             const dir = dirData as any;
             const dirOffset = dir.offset || { x: 0, y: 0 };
 
-            // Clamp direction offset to max distance
             let defaultX = dirOffset.x;
             let defaultY = dirOffset.y;
             defaultX = Math.max(-this.maxCoordinateDistance, Math.min(this.maxCoordinateDistance, defaultX));
@@ -1218,17 +1113,15 @@ class AnimatorTool {
           }
         }
 
-        // Clamp all imported frame durations to valid range
         this.clampAllFrameDurations();
 
-        // Auto-select first animation and direction
         const animationNames = Object.keys(this.metadata.animations);
         if (animationNames.length > 0) {
           this.selectedAnimation = animationNames[0];
           const directionNames = Object.keys(this.metadata.animations[this.selectedAnimation].directions);
           if (directionNames.length > 0) {
             this.selectedDirection = directionNames[0];
-            // Auto-select first frame if it exists
+
             const direction = this.metadata.animations[this.selectedAnimation].directions[this.selectedDirection];
             if (direction && direction.frames.length > 0) {
               this.selectedTimelineFrame = 0;
@@ -1236,18 +1129,15 @@ class AnimatorTool {
           }
         }
 
-        // Update all UI
         this.updateFormFields();
         this.updateAnimationSelect();
         this.updateDirectionSelect();
 
-        // Render empty states (but not timeline - that needs spritesheet)
         this.renderFramesGrid();
         this.renderGridCanvas();
 
         this.updateExportButtonState();
 
-        // Prompt to load spritesheet image
         const shouldLoadImage = await this.showConfirm(
           'Spritesheet Lookup',
           `Import complete! Locate the spritesheet image${this.metadata.imageSource ? ` (${this.metadata.imageSource})` : ''} to continue.`
@@ -1259,7 +1149,6 @@ class AnimatorTool {
           this.resetAfterImportCancel();
         }
 
-        // Reset file input
         (event.target as HTMLInputElement).value = '';
         this.triggerAutosave();
       } catch (error) {
@@ -1288,7 +1177,6 @@ class AnimatorTool {
             this.currentImage = img;
             this.currentImageDataURL = event.target?.result as string;
 
-            // Auto-detect grid dimensions if not set or if dimensions don't match
             let autoDetected = false;
             const frameWidth = this.metadata.frameWidth;
             const frameHeight = this.metadata.frameHeight;
@@ -1297,15 +1185,13 @@ class AnimatorTool {
               const cols = Math.floor(img.width / frameWidth);
               const rows = Math.floor(img.height / frameHeight);
 
-              // If columns/rows are 0, auto-detect
-              // Or if they're set but don't match the image dimensions, update them
               if (cols > 0 && rows > 0) {
                 if (this.metadata.columns === 0 && this.metadata.rows === 0) {
                   this.metadata.columns = cols;
                   this.metadata.rows = rows;
                   autoDetected = true;
                 } else if (this.metadata.columns !== cols || this.metadata.rows !== rows) {
-                  // Dimensions don't match - update to detected values
+
                   this.metadata.columns = cols;
                   this.metadata.rows = rows;
                   autoDetected = true;
@@ -1321,17 +1207,14 @@ class AnimatorTool {
             this.updateSplitFramesButtonState();
             this.triggerAutosave();
 
-            // Auto-split frames if we have grid info
             if (this.metadata.columns > 0 && this.metadata.rows > 0) {
               this.splitFramesFromImage();
             }
 
-            // Render timeline and grid canvas to show frames
             this.renderTimelineSequence();
             this.renderTimelineScrubber();
             this.renderGridCanvas();
 
-            // Update all button states
             this.updateExportButtonState();
             this.updatePlaybackButtonState();
             this.updateTimelineButtonState();
@@ -1342,7 +1225,6 @@ class AnimatorTool {
       }
     };
 
-    // Handle cancellation - reset if no file was selected
     input.addEventListener('cancel', () => {
       if (!resetCalled) {
         resetCalled = true;
@@ -1350,7 +1232,6 @@ class AnimatorTool {
       }
     });
 
-    // Fallback for browsers that don't support cancel event
     setTimeout(() => {
       document.body.onfocus = () => {
         setTimeout(() => {
@@ -1367,7 +1248,7 @@ class AnimatorTool {
   }
 
   private resetAfterImportCancel(): void {
-    // Reset everything if user doesn't load spritesheet
+
     this.metadata = this.createEmptyMetadata();
     this.currentImage = null;
     this.currentImageDataURL = null;
@@ -1376,11 +1257,9 @@ class AnimatorTool {
     this.selectedDirection = '';
     this.selectedTimelineFrame = null;
 
-    // Hide info panel
     const infoPanel = document.getElementById('info-panel');
     if (infoPanel) infoPanel.style.display = 'none';
 
-    // Show placeholder
     const placeholder = document.getElementById('spritesheet-preview-placeholder');
     if (placeholder) placeholder.style.display = 'flex';
     this.previewCanvas.style.display = 'none';
@@ -1413,11 +1292,9 @@ class AnimatorTool {
     this.selectedDirection = '';
     this.selectedTimelineFrame = null;
 
-    // Hide info panel
     const infoPanel = document.getElementById('info-panel');
     if (infoPanel) infoPanel.style.display = 'none';
 
-    // Show placeholder
     this.previewCanvas.style.display = 'none';
     const placeholder = document.getElementById('spritesheet-preview-placeholder');
     if (placeholder) placeholder.style.display = 'flex';
@@ -1437,8 +1314,6 @@ class AnimatorTool {
     this.triggerAutosave();
   }
 
-  // ===== IMAGE LOADING =====
-
   private loadImage(): void {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1446,7 +1321,7 @@ class AnimatorTool {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // Auto-populate Image Source with the file name
+
         if (!this.metadata.imageSource) {
           this.metadata.imageSource = file.name;
         }
@@ -1458,7 +1333,6 @@ class AnimatorTool {
             this.currentImage = img;
             this.currentImageDataURL = event.target?.result as string;
 
-            // Auto-detect grid dimensions
             let autoDetected = false;
             const frameWidth = this.metadata.frameWidth;
             const frameHeight = this.metadata.frameHeight;
@@ -1480,7 +1354,6 @@ class AnimatorTool {
             this.updateSplitFramesButtonState();
             this.triggerAutosave();
 
-            // Ask to auto-split if grid was detected
             if (autoDetected) {
               const shouldSplit = await this.showConfirm(
                 'Auto-Split Frames?',
@@ -1491,7 +1364,6 @@ class AnimatorTool {
               }
             }
 
-            // Render the grid canvas to show selected frame
             this.renderGridCanvas();
           };
           img.src = event.target?.result as string;
@@ -1556,12 +1428,9 @@ class AnimatorTool {
 
       localStorage.setItem(this.autosaveKey, JSON.stringify(data));
     } catch (error) {
-      console.error('Autosave failed:', error);
       this.showNotification('Autosave failed (data may be too large)', 'error');
     }
   }
-
-  // ===== SPLIT FRAMES =====
 
   private splitFramesFromImage(): void {
     if (!this.currentImage) {
@@ -1632,7 +1501,6 @@ class AnimatorTool {
       frameEl.appendChild(canvas);
       frameEl.appendChild(label);
 
-      // Drag start handler
       frameEl.addEventListener('dragstart', (e) => {
         e.dataTransfer!.setData('frameIndex', frame.index.toString());
         e.dataTransfer!.effectAllowed = 'copy';
@@ -1641,8 +1509,6 @@ class AnimatorTool {
       container.appendChild(frameEl);
     });
   }
-
-  // ===== TIMELINE MANAGEMENT =====
 
   private addFrameToTimeline(frameIndex: number): void {
     if (!this.selectedAnimation || !this.selectedDirection) {
@@ -1653,10 +1519,8 @@ class AnimatorTool {
     const direction = this.getCurrentDirection();
     if (!direction) return;
 
-    // Save state for undo
     this.pushUndoState('frames', JSON.parse(JSON.stringify(direction.frames)));
 
-    // Use direction offset as default position, clamped to max distance
     let defaultX = direction.offset.x;
     let defaultY = direction.offset.y;
     defaultX = Math.max(-this.maxCoordinateDistance, Math.min(this.maxCoordinateDistance, defaultX));
@@ -1671,7 +1535,6 @@ class AnimatorTool {
       offsetY: 0
     });
 
-    // Auto-select the newly added frame
     this.selectedTimelineFrame = direction.frames.length - 1;
 
     this.renderTimelineSequence();
@@ -1712,7 +1575,6 @@ class AnimatorTool {
     const frame = direction.frames[this.selectedTimelineFrame];
     if (!frame) return;
 
-    // Save state for undo
     this.pushUndoState('coords', {
       x: frame.x,
       y: frame.y,
@@ -1720,7 +1582,6 @@ class AnimatorTool {
       offsetY: frame.offsetY
     }, this.selectedTimelineFrame);
 
-    // Reset only the selected frame
     frame.x = 0;
     frame.y = 0;
     frame.offsetX = 0;
@@ -1762,13 +1623,11 @@ class AnimatorTool {
         frameEl.style.borderColor = '#8b5cf6';
       }
 
-      // Frame number
       const frameNumber = document.createElement('span');
       frameNumber.textContent = timelineFrame.frameIndex.toString();
       frameNumber.style.cssText = 'color: #fff; font-weight: 500; min-width: 20px;';
       frameEl.appendChild(frameNumber);
 
-      // Duration input (inline editable)
       const durationInput = document.createElement('input');
       durationInput.type = 'number';
       durationInput.value = timelineFrame.duration.toString();
@@ -1784,13 +1643,13 @@ class AnimatorTool {
         font-size: 13px;
       `;
       durationInput.addEventListener('focus', (e) => {
-        // Save state for undo when user starts editing
+
         this.pushUndoState('duration', timelineFrame.duration, index);
       });
       durationInput.addEventListener('input', (e) => {
         e.stopPropagation();
         const newDuration = parseInt((e.target as HTMLInputElement).value);
-        // Clamp duration between 10ms and 10000ms (10 seconds)
+
         if (!isNaN(newDuration)) {
           timelineFrame.duration = Math.max(10, Math.min(10000, newDuration));
           this.renderTimelineScrubber();
@@ -1800,14 +1659,14 @@ class AnimatorTool {
       durationInput.addEventListener('blur', (e) => {
         e.stopPropagation();
         const newDuration = parseInt((e.target as HTMLInputElement).value);
-        // Clamp duration between 10ms and 10000ms (10 seconds)
+
         if (!isNaN(newDuration)) {
           timelineFrame.duration = Math.max(10, Math.min(10000, newDuration));
         } else {
-          // If invalid input, reset to current duration
+
           timelineFrame.duration = Math.max(10, Math.min(10000, timelineFrame.duration));
         }
-        // Update the input to show the clamped value
+
         (e.target as HTMLInputElement).value = timelineFrame.duration.toString();
         this.renderTimelineScrubber();
         this.triggerAutosave();
@@ -1817,15 +1676,13 @@ class AnimatorTool {
       });
       frameEl.appendChild(durationInput);
 
-      // ms label
       const msLabel = document.createElement('span');
       msLabel.textContent = 'ms';
       msLabel.style.cssText = 'color: #888; font-size: 12px;';
       frameEl.appendChild(msLabel);
 
-      // Click to select
       frameEl.addEventListener('click', () => {
-        if (this.isPlaying) return; // Disable selection during playback
+        if (this.isPlaying) return;
         this.selectedTimelineFrame = index;
         this.renderTimelineSequence();
         this.renderTimelineScrubber();
@@ -1834,7 +1691,6 @@ class AnimatorTool {
         this.triggerAutosave();
       });
 
-      // Delete button
       const deleteBtn = document.createElement('button');
       deleteBtn.textContent = '×';
       deleteBtn.style.cssText = `
@@ -1858,12 +1714,10 @@ class AnimatorTool {
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
 
-        // Save state for undo
         this.pushUndoState('frames', JSON.parse(JSON.stringify(direction.frames)));
 
         direction.frames.splice(index, 1);
 
-        // Adjust selected frame index after deletion
         if (direction.frames.length === 0) {
           this.selectedTimelineFrame = null;
         } else if (this.selectedTimelineFrame !== null) {
@@ -1883,7 +1737,6 @@ class AnimatorTool {
       });
       frameEl.appendChild(deleteBtn);
 
-      // Drag and drop handlers for reordering
       frameEl.addEventListener('dragstart', (e) => {
         this.draggedTimelineElement = frameEl;
         this.draggedTimelineIndex = index;
@@ -1891,7 +1744,6 @@ class AnimatorTool {
         e.dataTransfer!.effectAllowed = 'move';
         e.dataTransfer!.setData('timeline-reorder', index.toString());
 
-        // Add a slight delay to allow the drag image to be created
         setTimeout(() => {
           if (this.draggedTimelineElement) {
             this.draggedTimelineElement.style.opacity = '0.3';
@@ -1911,7 +1763,6 @@ class AnimatorTool {
         this.dragOverTargetIndex = -1;
         this.dragOverMouseSide = 'before';
 
-        // Remove all placeholder classes
         document.querySelectorAll('.timeline-frame-item').forEach(el => {
           el.classList.remove('drag-over', 'drop-before', 'drop-after');
         });
@@ -1922,20 +1773,16 @@ class AnimatorTool {
         e.preventDefault();
         e.dataTransfer!.dropEffect = 'move';
 
-        // Don't show drop indicator on the dragged element itself
         if (frameEl === this.draggedTimelineElement) return;
 
-        // Remove previous drop indicators
         document.querySelectorAll('.timeline-frame-item').forEach(el => {
           el.classList.remove('drop-before', 'drop-after');
         });
 
-        // Determine if we should insert before or after this element
         const rect = frameEl.getBoundingClientRect();
         const midpoint = rect.left + rect.width / 2;
         const mouseX = e.clientX;
 
-        // Store the target info for the drop handler
         this.dragOverTargetIndex = index;
         this.dragOverMouseSide = mouseX < midpoint ? 'before' : 'after';
 
@@ -1959,7 +1806,6 @@ class AnimatorTool {
     const track = document.getElementById('timeline-track');
     if (!track) return;
 
-    // Clear existing dots (but keep playhead if it exists)
     const existingPlayhead = track.querySelector('.timeline-playhead');
     track.innerHTML = '';
     if (existingPlayhead) {
@@ -1969,33 +1815,29 @@ class AnimatorTool {
     const direction = this.getCurrentDirection();
     if (!direction || direction.frames.length === 0) return;
 
-    // Calculate total duration
     const totalDuration = direction.frames.reduce((sum, f) => sum + f.duration, 0);
     if (totalDuration === 0) return;
 
     let accumulatedTime = 0;
 
     direction.frames.forEach((frame, index) => {
-      // Calculate position as percentage
+
       const position = (accumulatedTime / totalDuration) * 100;
 
-      // Create dot container
       const dotContainer = document.createElement('div');
       dotContainer.className = 'timeline-frame-dot-container';
       dotContainer.style.left = `${position}%`;
       dotContainer.dataset.frameIndex = index.toString();
 
-      // Create dot
       const dot = document.createElement('div');
       dot.className = 'timeline-frame-dot';
       if (index === this.selectedTimelineFrame) {
         dot.classList.add('active');
       }
 
-      // Click to select frame
       dot.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (this.isPlaying) return; // Disable selection during playback
+        if (this.isPlaying) return;
         this.selectedTimelineFrame = index;
         this.renderTimelineSequence();
         this.renderTimelineScrubber();
@@ -2004,7 +1846,6 @@ class AnimatorTool {
         this.triggerAutosave();
       });
 
-      // Create time label
       const timeLabel = document.createElement('span');
       timeLabel.className = 'timeline-frame-time';
       timeLabel.textContent = `${accumulatedTime}ms`;
@@ -2016,7 +1857,6 @@ class AnimatorTool {
       accumulatedTime += frame.duration;
     });
 
-    // Update playhead position when not playing
     this.updatePlayheadPosition();
   }
 
@@ -2024,13 +1864,11 @@ class AnimatorTool {
     const exportBtn = document.getElementById('export-json-btn') as HTMLButtonElement;
     if (!exportBtn) return;
 
-    // Check if spritesheet is loaded
     if (!this.currentImage) {
       exportBtn.disabled = true;
       return;
     }
 
-    // Check if any animation direction has at least one frame
     let hasAnyFrames = false;
     for (const animName in this.metadata.animations) {
       const animation = this.metadata.animations[animName];
@@ -2054,25 +1892,20 @@ class AnimatorTool {
     const direction = this.getCurrentDirection();
     const hasFrames = direction && direction.frames.length > 0;
 
-    // Play/Pause button is enabled when there are frames
     if (playPauseBtn) playPauseBtn.disabled = !hasFrames;
 
-    // Stop button is enabled when:
-    // - Currently playing, OR
-    // - Any frame selected that is NOT frame 0
-    // Disabled only when at frame 0 (beginning) and not playing
     if (stopBtn) {
       if (!hasFrames) {
-        // No frames at all - disable
+
         stopBtn.disabled = true;
       } else if (this.isPlaying) {
-        // Playing - always enable
+
         stopBtn.disabled = false;
       } else if (this.selectedTimelineFrame === null || this.selectedTimelineFrame === 0) {
-        // At beginning (frame 0 or no selection) and not playing - disable
+
         stopBtn.disabled = true;
       } else {
-        // Any other frame selected - enable
+
         stopBtn.disabled = false;
       }
     }
@@ -2093,11 +1926,9 @@ class AnimatorTool {
     const splitBtn = document.getElementById('split-frames-btn') as HTMLButtonElement;
     if (!splitBtn) return;
 
-    // Disable if no spritesheet or frames already split
     const canSplit = this.currentImage && this.splitFrames.length === 0;
     splitBtn.disabled = !canSplit;
 
-    // Also disable input boxes when frames are split
     this.updateSpritesheetInputsState();
   }
 
@@ -2107,7 +1938,6 @@ class AnimatorTool {
     const columnsInput = document.getElementById('columns') as HTMLInputElement;
     const rowsInput = document.getElementById('rows') as HTMLInputElement;
 
-    // Disable inputs if frames are already split
     const shouldDisable = this.splitFrames.length > 0;
 
     if (frameWidthInput) frameWidthInput.disabled = shouldDisable;
@@ -2115,8 +1945,6 @@ class AnimatorTool {
     if (columnsInput) columnsInput.disabled = shouldDisable;
     if (rowsInput) rowsInput.disabled = shouldDisable;
   }
-
-  // ===== ANIMATION & DIRECTION MANAGEMENT =====
 
   private showAnimationModal(editMode: boolean = false): void {
     const modal = document.getElementById('animation-modal');
@@ -2135,12 +1963,10 @@ class AnimatorTool {
       this.editingAnimationName = null;
     }
 
-    // Remove old keyboard handler if exists
     if (this.animationModalKeyHandler) {
       nameInput.removeEventListener('keydown', this.animationModalKeyHandler);
     }
 
-    // Create new keyboard handler
     this.animationModalKeyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -2151,7 +1977,6 @@ class AnimatorTool {
       }
     };
 
-    // Add new listener
     nameInput.addEventListener('keydown', this.animationModalKeyHandler);
 
     modal.style.display = 'flex';
@@ -2167,15 +1992,13 @@ class AnimatorTool {
       return;
     }
 
-    // Edit mode: rename existing animation
     if (this.editingAnimationName) {
-      // Check if new name already exists (and it's not the same as current)
+
       if (animName !== this.editingAnimationName && this.metadata.animations[animName]) {
         this.showNotification('Animation with this name already exists', 'warning');
         return;
       }
 
-      // If name changed, rename the animation
       if (animName !== this.editingAnimationName) {
         this.metadata.animations[animName] = this.metadata.animations[this.editingAnimationName];
         delete this.metadata.animations[this.editingAnimationName];
@@ -2184,7 +2007,7 @@ class AnimatorTool {
 
       this.editingAnimationName = null;
     } else {
-      // Add mode: create new animation
+
       if (this.metadata.animations[animName]) {
         this.showNotification('Animation with this name already exists', 'warning');
         return;
@@ -2192,7 +2015,7 @@ class AnimatorTool {
 
       this.metadata.animations[animName] = { directions: {} };
       this.selectedAnimation = animName;
-      // Clear selection state for new animation
+
       this.selectedDirection = '';
       this.selectedTimelineFrame = null;
     }
@@ -2235,16 +2058,15 @@ class AnimatorTool {
     this.selectedDirection = '';
     this.selectedTimelineFrame = null;
 
-    // Auto-select first remaining animation if any exist
     const animationNames = Object.keys(this.metadata.animations);
     if (animationNames.length > 0) {
       this.selectedAnimation = animationNames[0];
-      // Auto-select first direction if it exists
+
       const directions = this.metadata.animations[this.selectedAnimation]?.directions || {};
       const directionNames = Object.keys(directions);
       if (directionNames.length > 0) {
         this.selectedDirection = directionNames[0];
-        // Auto-select first frame if it exists
+
         const direction = directions[this.selectedDirection];
         if (direction && direction.frames.length > 0) {
           this.selectedTimelineFrame = 0;
@@ -2265,7 +2087,7 @@ class AnimatorTool {
   }
 
   private onAnimationChange(): void {
-    // Stop playback if currently playing
+
     if (this.isPlaying) {
       this.stopPlayback();
     }
@@ -2273,13 +2095,12 @@ class AnimatorTool {
     this.selectedDirection = '';
     this.selectedTimelineFrame = null;
 
-    // Auto-select first direction if it exists
     if (this.selectedAnimation) {
       const directions = this.metadata.animations[this.selectedAnimation]?.directions || {};
       const directionNames = Object.keys(directions);
       if (directionNames.length > 0) {
         this.selectedDirection = directionNames[0];
-        // Auto-select first frame if it exists
+
         const direction = directions[this.selectedDirection];
         if (direction && direction.frames.length > 0) {
           this.selectedTimelineFrame = 0;
@@ -2317,7 +2138,6 @@ class AnimatorTool {
     if (editBtn) editBtn.disabled = false;
     if (deleteBtn) deleteBtn.disabled = false;
 
-    // Prevent browser from auto-selecting first option (which triggers change event)
     select.selectedIndex = -1;
 
     animationNames.forEach((animName) => {
@@ -2327,7 +2147,6 @@ class AnimatorTool {
       select.appendChild(option);
     });
 
-    // Explicitly set the select value to the current selection
     if (this.selectedAnimation) {
       select.value = this.selectedAnimation;
     }
@@ -2355,12 +2174,10 @@ class AnimatorTool {
       (document.getElementById('loop-checkbox') as HTMLInputElement).checked = false;
     }
 
-    // Remove old keyboard handler if exists
     if (this.directionModalKeyHandler) {
       modal.removeEventListener('keydown', this.directionModalKeyHandler);
     }
 
-    // Create new keyboard handler
     this.directionModalKeyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -2371,7 +2188,6 @@ class AnimatorTool {
       }
     };
 
-    // Add new listener
     modal.addEventListener('keydown', this.directionModalKeyHandler);
 
     modal.style.display = 'flex';
@@ -2406,7 +2222,7 @@ class AnimatorTool {
     }
 
     this.selectedDirection = dirName;
-    this.selectedTimelineFrame = null; // Clear selected frame for new direction
+    this.selectedTimelineFrame = null;
     this.updateDirectionSelect();
     this.renderTimelineSequence();
     this.renderTimelineScrubber();
@@ -2436,12 +2252,11 @@ class AnimatorTool {
     this.selectedDirection = '';
     this.selectedTimelineFrame = null;
 
-    // Auto-select first remaining direction if any exist
     const directions = this.metadata.animations[this.selectedAnimation]?.directions || {};
     const directionNames = Object.keys(directions);
     if (directionNames.length > 0) {
       this.selectedDirection = directionNames[0];
-      // Auto-select first frame if it exists
+
       const direction = directions[this.selectedDirection];
       if (direction && direction.frames.length > 0) {
         this.selectedTimelineFrame = 0;
@@ -2460,14 +2275,14 @@ class AnimatorTool {
   }
 
   private onDirectionChange(): void {
-    // Stop playback if currently playing
+
     if (this.isPlaying) {
       this.stopPlayback();
     }
 
     const direction = this.getCurrentDirection();
     if (direction && direction.frames.length > 0) {
-      this.selectedTimelineFrame = 0; // Auto-select first frame
+      this.selectedTimelineFrame = 0;
     } else {
       this.selectedTimelineFrame = null;
     }
@@ -2508,7 +2323,6 @@ class AnimatorTool {
       if (editBtn) editBtn.disabled = false;
       if (deleteBtn) deleteBtn.disabled = false;
 
-      // Prevent browser from auto-selecting first option (which triggers change event)
       select.selectedIndex = -1;
 
       directionNames.forEach((dirName) => {
@@ -2518,7 +2332,6 @@ class AnimatorTool {
         select.appendChild(option);
       });
 
-      // Explicitly set the select value to the current selection
       if (this.selectedDirection) {
         select.value = this.selectedDirection;
       }
@@ -2545,7 +2358,6 @@ class AnimatorTool {
     const confirmModal = document.getElementById('confirm-modal');
     const nameInput = document.getElementById('animation-name') as HTMLInputElement;
 
-    // Remove keyboard handlers
     if (this.animationModalKeyHandler && nameInput) {
       nameInput.removeEventListener('keydown', this.animationModalKeyHandler);
       this.animationModalKeyHandler = null;
@@ -2555,15 +2367,12 @@ class AnimatorTool {
       this.directionModalKeyHandler = null;
     }
 
-    // Hide modals
     if (animModal) animModal.style.display = 'none';
     if (dirModal) dirModal.style.display = 'none';
     if (confirmModal) confirmModal.style.display = 'none';
 
     this.editingAnimationName = null;
   }
-
-  // ===== PLAYBACK CONTROLS =====
 
   private togglePlayPause(): void {
     if (!this.selectedAnimation || !this.selectedDirection) {
@@ -2595,7 +2404,6 @@ class AnimatorTool {
       playPauseBtn.className = 'btn btn-pause';
     }
 
-    // Create or show playhead
     const track = document.getElementById('timeline-track');
     if (track) {
       let playhead = track.querySelector('.timeline-playhead') as HTMLElement;
@@ -2607,7 +2415,6 @@ class AnimatorTool {
       playhead.style.left = '0%';
       playhead.style.display = 'block';
 
-      // Reset all dots to normal size at start
       const dots = track.querySelectorAll('.timeline-frame-dot');
       dots.forEach((dot) => {
         (dot as HTMLElement).style.transform = 'scale(1)';
@@ -2622,7 +2429,6 @@ class AnimatorTool {
   private pausePlayback(): void {
     this.isPlaying = false;
 
-    // Find the closest frame based on current playback time
     const direction = this.getCurrentDirection();
     if (direction && direction.frames.length > 0) {
       const currentTime = Date.now() - this.playbackStartTime;
@@ -2630,13 +2436,11 @@ class AnimatorTool {
       let closestFrame = 0;
       let minDistance = Infinity;
 
-      // Find which frame is closest to the current time
       for (let i = 0; i < direction.frames.length; i++) {
         const frameStartTime = accumulatedTime;
         const frameEndTime = accumulatedTime + direction.frames[i].duration;
         const frameMidTime = (frameStartTime + frameEndTime) / 2;
 
-        // Calculate distance from current time to frame middle
         const distance = Math.abs(currentTime - frameMidTime);
 
         if (distance < minDistance) {
@@ -2647,10 +2451,9 @@ class AnimatorTool {
         accumulatedTime += direction.frames[i].duration;
       }
 
-      // Select the closest frame
       this.selectedTimelineFrame = closestFrame;
     } else {
-      // Fallback: use current playback frame
+
       this.selectedTimelineFrame = this.playbackFrame;
     }
 
@@ -2665,9 +2468,6 @@ class AnimatorTool {
       this.playbackAnimationId = null;
     }
 
-    // The playhead position will be updated by renderTimelineScrubber -> updatePlayheadPosition
-
-    // Update UI to show the selected frame
     this.renderTimelineSequence();
     this.renderTimelineScrubber();
     this.renderGridCanvas();
@@ -2676,14 +2476,14 @@ class AnimatorTool {
   }
 
   private updatePlayheadPosition(): void {
-    // Only update playhead when not playing
+
     if (this.isPlaying) return;
 
     const track = document.getElementById('timeline-track');
     const direction = this.getCurrentDirection();
 
     if (!track || !direction || direction.frames.length === 0) {
-      // Hide playhead if no frames exist
+
       const playhead = track?.querySelector('.timeline-playhead') as HTMLElement;
       if (playhead) {
         playhead.style.display = 'none';
@@ -2698,23 +2498,19 @@ class AnimatorTool {
       track.appendChild(playhead);
     }
 
-    // If no frame is selected, show at position 0
     if (this.selectedTimelineFrame === null) {
       playhead.style.left = '0%';
       playhead.style.display = 'block';
       return;
     }
 
-    // Calculate the position of the selected frame
     const totalDuration = direction.frames.reduce((sum, f) => sum + f.duration, 0);
     let accumulatedTime = 0;
 
-    // Calculate time up to the start of the selected frame
     for (let i = 0; i < this.selectedTimelineFrame; i++) {
       accumulatedTime += direction.frames[i].duration;
     }
 
-    // Position playhead at the START of the frame (not center)
     const position = (accumulatedTime / totalDuration) * 100;
     playhead.style.left = `${position}%`;
     playhead.style.display = 'block';
@@ -2725,7 +2521,6 @@ class AnimatorTool {
     this.playbackFrame = 0;
     this.playbackStartTime = 0;
 
-    // Select first frame (frame 0) to return to beginning
     this.selectedTimelineFrame = 0;
 
     const playPauseBtn = document.getElementById('play-pause-btn');
@@ -2739,13 +2534,11 @@ class AnimatorTool {
       this.playbackAnimationId = null;
     }
 
-    // Reset all dots to normal size
     const dots = document.querySelectorAll('.timeline-frame-dot');
     dots.forEach((dot) => {
       (dot as HTMLElement).style.transform = '';
     });
 
-    // Update UI - this will position playhead at frame 0 via updatePlayheadPosition()
     this.renderTimelineSequence();
     this.renderTimelineScrubber();
     this.updatePlaybackDisplay();
@@ -2767,7 +2560,6 @@ class AnimatorTool {
     let accumulatedTime = 0;
     let currentFrame = 0;
 
-    // Find which frame we should be showing
     for (let i = 0; i < direction.frames.length; i++) {
       accumulatedTime += direction.frames[i].duration;
       if (currentTime < accumulatedTime) {
@@ -2776,15 +2568,14 @@ class AnimatorTool {
       }
     }
 
-    // Check if animation finished
     if (currentTime >= accumulatedTime) {
       const loopCheckbox = document.getElementById('preview-loop-checkbox') as HTMLInputElement;
       if (loopCheckbox && loopCheckbox.checked) {
-        // Loop: restart animation
+
         this.playbackStartTime = Date.now();
         currentFrame = 0;
       } else {
-        // Don't loop: stop at last frame
+
         currentFrame = direction.frames.length - 1;
         this.stopPlayback();
         return;
@@ -2794,7 +2585,6 @@ class AnimatorTool {
     this.playbackFrame = currentFrame;
     this.updatePlaybackDisplay();
 
-    // Update playhead position
     const track = document.getElementById('timeline-track');
     if (track) {
       const playhead = track.querySelector('.timeline-playhead') as HTMLElement;
@@ -2803,37 +2593,32 @@ class AnimatorTool {
         playhead.style.left = `${progress}%`;
       }
 
-      // Update dot sizes based on current frame
       const dots = track.querySelectorAll('.timeline-frame-dot-container');
       dots.forEach((container, index) => {
         const dot = container.querySelector('.timeline-frame-dot') as HTMLElement;
         if (dot) {
           if (index === currentFrame) {
-            // Calculate how far into the current frame we are
+
             let frameStartTime = 0;
             for (let i = 0; i < index; i++) {
               frameStartTime += direction.frames[i].duration;
             }
             const timeIntoFrame = currentTime - frameStartTime;
 
-            // Get the previous frame's duration for transition
-            // If this is frame 0, use the last frame's duration
             const prevFrameIndex = index === 0 ? direction.frames.length - 1 : index - 1;
             const transitionDuration = direction.frames[prevFrameIndex].duration;
 
-            // If we just entered this frame, set transition
-            if (timeIntoFrame < 50) { // Within first 50ms of frame
+            if (timeIntoFrame < 50) {
               dot.style.transition = `transform ${transitionDuration}ms linear`;
             }
 
-            // Grow current frame dot
             dot.style.transform = 'scale(1.4)';
           } else if (index < currentFrame) {
-            // Already played - keep at max size
+
             dot.style.transform = 'scale(1.4)';
             dot.style.transition = 'none';
           } else {
-            // Not yet played - normal size
+
             dot.style.transform = 'scale(1)';
             dot.style.transition = 'none';
           }
@@ -2841,7 +2626,6 @@ class AnimatorTool {
       });
     }
 
-    // Render only the current playback frame on grid
     this.renderPlaybackFrame(currentFrame);
 
     this.playbackAnimationId = requestAnimationFrame(() => this.animatePlayback());
@@ -2850,41 +2634,33 @@ class AnimatorTool {
   private renderPlaybackFrame(frameIndex: number): void {
     if (!this.gridCanvas || !this.gridCtx) return;
 
-    // Ensure image smoothing is disabled for crisp pixel art
     this.gridCtx.imageSmoothingEnabled = false;
 
     const width = this.gridCanvas.width;
     const height = this.gridCanvas.height;
 
-    // Clear canvas
     this.gridCtx.fillStyle = '#0e111b';
     this.gridCtx.fillRect(0, 0, width, height);
 
-    // Calculate center point
     const centerX = width / 2 + this.gridPanX;
     const centerY = height / 2 + this.gridPanY;
 
-    // Draw grid
     this.drawGrid(centerX, centerY);
 
-    // Draw center crosshair (purple lines)
     this.gridCtx.strokeStyle = '#8b5cf6';
     this.gridCtx.lineWidth = 2;
     this.gridCtx.setLineDash([]);
 
-    // Vertical line
     this.gridCtx.beginPath();
     this.gridCtx.moveTo(centerX, 0);
     this.gridCtx.lineTo(centerX, height);
     this.gridCtx.stroke();
 
-    // Horizontal line
     this.gridCtx.beginPath();
     this.gridCtx.moveTo(0, centerY);
     this.gridCtx.lineTo(width, centerY);
     this.gridCtx.stroke();
 
-    // Draw only the current frame
     const direction = this.getCurrentDirection();
     if (direction && this.currentImage && direction.frames[frameIndex]) {
       const timelineFrame = direction.frames[frameIndex];
@@ -2905,14 +2681,12 @@ class AnimatorTool {
           frameX, frameY, scaledWidth, scaledHeight
         );
 
-        // Draw coordinate label
         this.gridCtx.fillStyle = '#ffffff';
         this.gridCtx.font = '11px monospace';
         this.gridCtx.textAlign = 'center';
         this.gridCtx.textBaseline = 'top';
         const coordText = `(${totalX}, ${totalY})`;
 
-        // Draw text background
         const textMetrics = this.gridCtx.measureText(coordText);
         const textX = frameX + scaledWidth / 2;
         const textY = frameY + scaledHeight + 4;
@@ -2920,7 +2694,6 @@ class AnimatorTool {
         this.gridCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.gridCtx.fillRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
 
-        // Draw subtle border
         this.gridCtx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
         this.gridCtx.lineWidth = 1;
         this.gridCtx.strokeRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
@@ -2936,24 +2709,22 @@ class AnimatorTool {
     const timeDisplay = document.getElementById('current-time-display');
     const direction = this.getCurrentDirection();
 
-    // Hide displays if no frames exist
     if (!direction || direction.frames.length === 0) {
       if (frameDisplay) frameDisplay.style.display = 'none';
       if (timeDisplay) timeDisplay.style.display = 'none';
       return;
     }
 
-    // Show displays and update content
     if (frameDisplay) {
       if (this.isPlaying) {
         frameDisplay.style.display = 'block';
         frameDisplay.textContent = `Frame: ${this.playbackFrame + 1}/${direction.frames.length}`;
       } else if (this.selectedTimelineFrame !== null) {
-        // Only show when a frame is actually selected
+
         frameDisplay.style.display = 'block';
         frameDisplay.textContent = `Frame: ${this.selectedTimelineFrame + 1}/${direction.frames.length}`;
       } else {
-        // No frame selected - hide display
+
         frameDisplay.style.display = 'none';
       }
     }
@@ -2964,59 +2735,48 @@ class AnimatorTool {
         const elapsedTime = Date.now() - this.playbackStartTime;
         timeDisplay.textContent = `Time: ${Math.round(elapsedTime)}ms`;
       } else if (!this.isPlaying && this.selectedTimelineFrame !== null) {
-        // Show time display when frame is selected but not playing
+
         timeDisplay.style.display = 'block';
         timeDisplay.textContent = `Time: 0ms`;
       } else {
-        // No frame selected - hide display
+
         timeDisplay.style.display = 'none';
       }
     }
   }
 
-  // ===== GRID CANVAS RENDERING =====
-
   private renderGridCanvas(): void {
     if (!this.gridCanvas || !this.gridCtx) return;
 
-    // Stop playback when rendering static grid
     if (this.isPlaying) return;
 
-    // Ensure image smoothing is disabled for crisp pixel art
     this.gridCtx.imageSmoothingEnabled = false;
 
     const width = this.gridCanvas.width;
     const height = this.gridCanvas.height;
 
-    // Clear canvas
     this.gridCtx.fillStyle = '#0e111b';
     this.gridCtx.fillRect(0, 0, width, height);
 
-    // Calculate center point
     const centerX = width / 2 + this.gridPanX;
     const centerY = height / 2 + this.gridPanY;
 
-    // Draw grid
     this.drawGrid(centerX, centerY);
 
-    // Draw center crosshair (purple lines)
     this.gridCtx.strokeStyle = '#8b5cf6';
     this.gridCtx.lineWidth = 2;
     this.gridCtx.setLineDash([]);
 
-    // Vertical line
     this.gridCtx.beginPath();
     this.gridCtx.moveTo(centerX, 0);
     this.gridCtx.lineTo(centerX, height);
     this.gridCtx.stroke();
 
-    // Horizontal line
     this.gridCtx.beginPath();
     this.gridCtx.moveTo(0, centerY);
     this.gridCtx.lineTo(width, centerY);
     this.gridCtx.stroke();
 
-    // Draw only the selected timeline frame
     const direction = this.getCurrentDirection();
     if (direction && this.currentImage && this.selectedTimelineFrame !== null) {
       const timelineFrame = direction.frames[this.selectedTimelineFrame];
@@ -3026,28 +2786,24 @@ class AnimatorTool {
           const scaledWidth = splitFrame.width * this.gridZoom;
           const scaledHeight = splitFrame.height * this.gridZoom;
 
-          // Position frame at center + position + offset
           const totalX = timelineFrame.x + timelineFrame.offsetX;
           const totalY = timelineFrame.y + timelineFrame.offsetY;
 
           const frameX = centerX + (totalX * this.gridZoom) - scaledWidth / 2;
           const frameY = centerY + (totalY * this.gridZoom) - scaledHeight / 2;
 
-          // Draw the frame image
           this.gridCtx.drawImage(
             this.currentImage,
             splitFrame.x, splitFrame.y, splitFrame.width, splitFrame.height,
             frameX, frameY, scaledWidth, scaledHeight
           );
 
-          // Draw coordinate label
           this.gridCtx.fillStyle = '#ffffff';
           this.gridCtx.font = '11px monospace';
           this.gridCtx.textAlign = 'center';
           this.gridCtx.textBaseline = 'top';
           const coordText = `(${totalX}, ${totalY})`;
 
-          // Draw text background with border to indicate clickability
           const textMetrics = this.gridCtx.measureText(coordText);
           const textX = frameX + scaledWidth / 2;
           const textY = frameY + scaledHeight + 4;
@@ -3055,7 +2811,6 @@ class AnimatorTool {
           this.gridCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
           this.gridCtx.fillRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
 
-          // Draw subtle border to indicate clickability
           this.gridCtx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
           this.gridCtx.lineWidth = 1;
           this.gridCtx.strokeRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
@@ -3074,7 +2829,6 @@ class AnimatorTool {
     const centerX = this.gridCanvas.width / 2 + this.gridPanX;
     const centerY = this.gridCanvas.height / 2 + this.gridPanY;
 
-    // Only check the selected frame
     const timelineFrame = direction.frames[this.selectedTimelineFrame];
     if (!timelineFrame) return null;
 
@@ -3120,7 +2874,6 @@ class AnimatorTool {
     const frameX = centerX + (totalX * this.gridZoom) - scaledWidth / 2;
     const frameY = centerY + (totalY * this.gridZoom) - scaledHeight / 2;
 
-    // Calculate coordinate label bounds
     const coordText = `(${totalX}, ${totalY})`;
     this.gridCtx.font = '11px monospace';
     const textMetrics = this.gridCtx.measureText(coordText);
@@ -3169,11 +2922,9 @@ class AnimatorTool {
     const labelWidth = textMetrics.width + 6;
     const labelHeight = 16;
 
-    // Remove any existing input
     const existingInput = document.getElementById('coord-inline-input');
     if (existingInput) existingInput.remove();
 
-    // Create inline input
     const input = document.createElement('input');
     input.id = 'coord-inline-input';
     input.type = 'text';
@@ -3199,11 +2950,10 @@ class AnimatorTool {
     let isClosing = false;
 
     const saveAndClose = () => {
-      // Prevent multiple calls
+
       if (isClosing) return;
       isClosing = true;
 
-      // Remove event listeners to prevent duplicate calls
       input.removeEventListener('blur', saveAndClose);
 
       const parts = input.value.replace(/[()]/g, '').split(',').map(s => s.trim());
@@ -3212,7 +2962,7 @@ class AnimatorTool {
         let newY = parseInt(parts[1]);
 
         if (!isNaN(newX) && !isNaN(newY)) {
-          // Save state for undo before changing coords
+
           this.pushUndoState('coords', {
             x: timelineFrame.x,
             y: timelineFrame.y,
@@ -3220,7 +2970,6 @@ class AnimatorTool {
             offsetY: timelineFrame.offsetY
           }, this.selectedTimelineFrame!);
 
-          // Clamp to max distance from center
           newX = Math.max(-this.maxCoordinateDistance, Math.min(this.maxCoordinateDistance, newX));
           newY = Math.max(-this.maxCoordinateDistance, Math.min(this.maxCoordinateDistance, newY));
 
@@ -3265,7 +3014,6 @@ class AnimatorTool {
     this.gridCtx.strokeStyle = '#2a2a3e';
     this.gridCtx.lineWidth = 1;
 
-    // Vertical lines
     let x = centerX % gridSize;
     while (x < width) {
       this.gridCtx.beginPath();
@@ -3284,7 +3032,6 @@ class AnimatorTool {
       x -= gridSize;
     }
 
-    // Horizontal lines
     let y = centerY % gridSize;
     while (y < height) {
       this.gridCtx.beginPath();
@@ -3373,7 +3120,6 @@ class AnimatorTool {
   }
 }
 
-// Initialize the tool when the page loads
 document.addEventListener('DOMContentLoaded', () => {
   new AnimatorTool();
 });

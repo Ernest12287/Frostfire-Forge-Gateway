@@ -29,8 +29,6 @@ interface ChunkData {
 }
 
 export default async function loadMap(data: any): Promise<boolean> {
-  try {
-    // Show loading screen
     if (loadingScreen) {
       loadingScreen.style.display = "flex";
       loadingScreen.style.opacity = "1";
@@ -38,18 +36,16 @@ export default async function loadMap(data: any): Promise<boolean> {
       progressBar.style.width = "0%";
     }
 
-    // Clear existing map data to force reload
     if (window.mapData) {
       window.mapData.loadedChunks.clear();
     }
 
-    // Clear localStorage cache for this map
     const mapName = data[1];
     if (mapName) {
       clearMapCache(mapName);
     }
 
-    // @ts-expect-error - pako is not defined because it is loaded in the index.html
+    //@ts-expect-error - Imported via HTML
     const inflated = pako.inflate(
       new Uint8Array(new Uint8Array(data[0].data)),
       { to: "string" }
@@ -60,27 +56,22 @@ export default async function loadMap(data: any): Promise<boolean> {
       throw new Error("Failed to parse map data");
     }
 
-    // Update progress: 10% for starting
     progressBar.style.width = "10%";
 
-    // Load tilesets
     const images = await loadTilesets(mapData.tilesets);
     if (!images.length) throw new Error("No tileset images loaded");
 
-    // Update progress: 30% after tilesets loaded
     progressBar.style.width = "30%";
 
-    // Initialize map metadata
     const CHUNK_SIZE = mapData.tilewidth;
     const chunksX = Math.ceil(mapData.width / CHUNK_SIZE);
     const chunksY = Math.ceil(mapData.height / CHUNK_SIZE);
 
-    // Extract spawn position from server data
     const spawnX = data[2] || 0;
     const spawnY = data[3] || 0;
 
     window.mapData = {
-      name: data[1], // Map name from server
+      name: data[1],
       width: mapData.width,
       height: mapData.height,
       tilewidth: mapData.tilewidth,
@@ -107,28 +98,22 @@ export default async function loadMap(data: any): Promise<boolean> {
       },
     };
 
-    // Initialize camera immediately to prevent sliding on spawn
     const { initializeCamera } = await import('./renderer.js');
     initializeCamera(spawnX, spawnY);
 
-    // Update progress: 40% after map metadata initialized
     progressBar.style.width = "40%";
 
-    // Load initial chunks around spawn position
     const chunkPixelSize = CHUNK_SIZE * mapData.tilewidth;
     const spawnChunkX = Math.floor(spawnX / chunkPixelSize);
     const spawnChunkY = Math.floor(spawnY / chunkPixelSize);
 
-    // Calculate chunks needed to cover viewport + padding
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const padding = chunkPixelSize; // Extra padding if needed
+    const padding = chunkPixelSize;
 
-    // Calculate how many chunks we need in each direction
     const chunksNeededX = Math.ceil((viewportWidth + padding * 2) / chunkPixelSize / 2);
     const chunksNeededY = Math.ceil((viewportHeight + padding * 2) / chunkPixelSize / 2);
 
-    // Load all chunks that could be visible
     const chunksToLoad: Array<{x: number, y: number}> = [];
     for (let dy = -chunksNeededY; dy <= chunksNeededY; dy++) {
       for (let dx = -chunksNeededX; dx <= chunksNeededX; dx++) {
@@ -140,16 +125,14 @@ export default async function loadMap(data: any): Promise<boolean> {
       }
     }
 
-    // Load chunks in parallel and update progress
     const totalChunks = chunksToLoad.length;
     let loadedCount = 0;
 
-    // Load all chunks in parallel for much faster loading
     const chunkPromises = chunksToLoad.map(chunk =>
       requestChunk(chunk.x, chunk.y).then(chunkData => {
         if (chunkData && chunkData.canvas) {
           loadedCount++;
-          // Update progress as each chunk completes
+
           const chunkProgress = 40 + (loadedCount / totalChunks) * 50;
           progressBar.style.width = `${chunkProgress}%`;
         }
@@ -157,17 +140,15 @@ export default async function loadMap(data: any): Promise<boolean> {
       })
     );
 
-    // Wait for all chunks to complete
     await Promise.all(chunkPromises);
 
-    // Verify all chunks are actually loaded
     const allChunksLoaded = chunksToLoad.every(chunk => {
       const chunkKey = `${chunk.x}-${chunk.y}`;
       return window.mapData.loadedChunks.has(chunkKey);
     });
 
     if (!allChunksLoaded) {
-      // Retry loading any missing chunks
+
       for (const chunk of chunksToLoad) {
         const chunkKey = `${chunk.x}-${chunk.y}`;
         if (!window.mapData.loadedChunks.has(chunkKey)) {
@@ -176,45 +157,35 @@ export default async function loadMap(data: any): Promise<boolean> {
       }
     }
 
-    // Update progress: 100% all chunks loaded
     progressBar.style.width = "100%";
 
-    // Set canvas to fixed viewport size with device pixel ratio support
     const dpr = window.devicePixelRatio || 1;
-    // Use window.innerHeight (380px on iOS) for canvas dimensions to cover address bar area
-    // but visualViewport.height (360px) for CSS variable
+
     const actualHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const fullHeight = actualHeight; // Add 20px to cover the white bar
+    const fullHeight = actualHeight;
     canvas.width = window.innerWidth * dpr;
     canvas.height = fullHeight * dpr;
 
-    // Check if device is touch-capable (mobile)
     const isTouchDevice = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
-    // Fix iOS Safari 100vh bug by setting actual viewport height
     document.documentElement.style.setProperty('--viewport-height', `${actualHeight}px`);
 
-    // Set positioning BEFORE changing display to prevent iOS Safari layout issues
     canvas.style.position = "fixed";
     canvas.style.top = "0";
     canvas.style.left = "0";
     canvas.style.backgroundColor = "#000000";
 
-    // Use full height to cover address bar area on iOS
     canvas.style.width = window.innerWidth + "px";
     canvas.style.height = fullHeight + "px";
 
-    // Set display last after all positioning is applied
     canvas.style.display = "block";
 
-
-    // Scale context to match device pixel ratio
     if (ctx) {
-      // Apply zoom out on mobile devices for better visibility
+
       if (isTouchDevice) {
-        const mobileZoom = 0.85; // 85% zoom = show more of the world
+        const mobileZoom = 0.85;
         ctx.scale(dpr * mobileZoom, dpr * mobileZoom);
-        // Translate to center the zoomed out view
+
         ctx.translate((window.innerWidth * (1 - mobileZoom)) / (2 * mobileZoom),
                       (fullHeight * (1 - mobileZoom)) / (2 * mobileZoom));
       } else {
@@ -223,17 +194,9 @@ export default async function loadMap(data: any): Promise<boolean> {
 
     }
 
-    // Wait to ensure 100% progress is visible
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Don't hide loading screen here - let socket.ts handle it after self-player sprite loads
-    // Loading screen will be hidden by checkAndHideLoadingScreen() when ready
-
     return true;
-  } catch (error) {
-    console.error("Map loading failed:", error);
-    throw error;
-  }
 }
 
 async function loadTilesets(tilesets: any[]): Promise<HTMLImageElement[]> {
@@ -260,7 +223,6 @@ async function loadTilesets(tilesets: any[]): Promise<HTMLImageElement[]> {
   const tilesetPromises = tilesets.map(async (tileset) => {
     const name = tileset.image.split("/").pop();
 
-    // Request tileset via HTTP from gateway
     const response = await fetch(`/tileset?name=${encodeURIComponent(name)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch tileset ${name}: ${response.statusText}`);
@@ -268,7 +230,8 @@ async function loadTilesets(tilesets: any[]): Promise<HTMLImageElement[]> {
     const tilesetData = await response.json();
     const compressedBase64 = tilesetData.data;
     const compressedBytes = base64ToUint8Array(compressedBase64);
-    // @ts-expect-error - pako is not defined because it is loaded in the index.html
+
+    //@ts-expect-error - Imported via HTML
     const inflatedBytes = pako.inflate(compressedBytes);
     const imageBase64 = uint8ArrayToBase64(inflatedBytes);
 
@@ -297,8 +260,7 @@ async function loadTilesets(tilesets: any[]): Promise<HTMLImageElement[]> {
   return Promise.all(tilesetPromises);
 }
 
-// Chunk cache functions
-const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 function getCacheKey(mapName: string, chunkX: number, chunkY: number): string {
   return `chunk_${mapName}_${chunkX}_${chunkY}`;
@@ -313,7 +275,7 @@ function saveChunkToCache(mapName: string, chunkX: number, chunkY: number, chunk
     };
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   } catch (error) {
-    console.warn('Failed to save chunk to cache:', error);
+    console.error("Error saving chunk to cache:", error);
   }
 }
 
@@ -322,7 +284,7 @@ function clearChunkFromCache(mapName: string, chunkX: number, chunkY: number): v
     const cacheKey = getCacheKey(mapName, chunkX, chunkY);
     localStorage.removeItem(cacheKey);
   } catch (error) {
-    console.warn('Failed to clear chunk from cache:', error);
+    console.error("Error clearing chunk from cache:", error);
   }
 }
 
@@ -336,7 +298,6 @@ function loadChunkFromCache(mapName: string, chunkX: number, chunkY: number): Ch
     const cacheData = JSON.parse(cached);
     const age = Date.now() - cacheData.timestamp;
 
-    // Check if cache is expired
     if (age > CACHE_EXPIRY_MS) {
       localStorage.removeItem(cacheKey);
       return null;
@@ -344,7 +305,6 @@ function loadChunkFromCache(mapName: string, chunkX: number, chunkY: number): Ch
 
     return cacheData.data;
   } catch (error) {
-    console.warn('Failed to load chunk from cache:', error);
     return null;
   }
 }
@@ -354,19 +314,19 @@ function clearMapCache(mapName?: string): void {
     const keys = Object.keys(localStorage);
     for (const key of keys) {
       if (mapName) {
-        // Clear specific map's chunks
+
         if (key.startsWith(`chunk_${mapName}_`)) {
           localStorage.removeItem(key);
         }
       } else {
-        // Clear all chunk caches
+
         if (key.startsWith('chunk_')) {
           localStorage.removeItem(key);
         }
       }
     }
   } catch (error) {
-    console.warn('Failed to clear chunk cache:', error);
+    console.error("Error clearing map cache:", error);
   }
 }
 
@@ -375,85 +335,69 @@ async function requestChunk(chunkX: number, chunkY: number): Promise<ChunkData |
 
   const chunkKey = `${chunkX}-${chunkY}`;
 
-  // Return memory cached chunk if available
   if (window.mapData.loadedChunks.has(chunkKey)) {
     return window.mapData.loadedChunks.get(chunkKey)!;
   }
 
-  // Validate bounds
   if (chunkX < 0 || chunkY < 0 || chunkX >= window.mapData.chunksX || chunkY >= window.mapData.chunksY) {
     return null;
   }
 
   try {
-    // Check localStorage cache first
+
     const cachedChunkData = loadChunkFromCache(window.mapData.name, chunkX, chunkY);
     let chunkData: ChunkData | null;
 
     if (cachedChunkData) {
-      // Use cached data
+
       chunkData = cachedChunkData;
     } else {
-      // Request from game server via WebSocket LOAD_CHUNK packet
+
       try {
         chunkData = await requestChunkViaWebSocket(window.mapData.name, chunkX, chunkY);
         if (!chunkData) {
-          console.error(`Failed to fetch chunk ${chunkKey} via WebSocket`);
           return null;
         }
 
-        // Save to localStorage cache
         saveChunkToCache(window.mapData.name, chunkX, chunkY, chunkData);
       } catch (error) {
-        console.error(`Failed to fetch chunk ${chunkKey}:`, error);
         return null;
       }
     }
 
-    // Render chunk to separate lower and upper canvases for proper z-ordering
     const { lowerCanvas, upperCanvas } = await renderChunkToCanvas(chunkData);
     chunkData.lowerCanvas = lowerCanvas;
     chunkData.upperCanvas = upperCanvas;
-    chunkData.canvas = lowerCanvas; // Keep for backwards compatibility
+    chunkData.canvas = lowerCanvas;
 
-    // Cache the chunk in memory
     window.mapData.loadedChunks.set(chunkKey, chunkData);
 
     return chunkData;
   } catch (error) {
-    console.error(`Error requesting chunk ${chunkKey}:`, error);
     return null;
   }
 }
 
-/**
- * Request a chunk from the game server via WebSocket LOAD_CHUNK packet
- */
 function requestChunkViaWebSocket(mapName: string, chunkX: number, chunkY: number): Promise<ChunkData | null> {
   return new Promise((resolve, reject) => {
     const chunkKey = `${chunkX}-${chunkY}`;
 
-    // Use global socket from socket module
     const socketModule = (window as any).__socketModule;
     if (!socketModule) {
       reject(new Error("Socket module not initialized"));
       return;
     }
 
-    // Set up pending request handler
-    // This will be resolved by the CHUNK_DATA handler in socket.ts
     socketModule.pendingMapChunkRequests.set(chunkKey, {
       resolve: (data: any) => resolve(data),
       reject: (error: Error) => reject(error)
     });
 
-    // Send LOAD_CHUNK request
     socketModule.sendRequest({
       type: 'LOAD_CHUNK',
       data: { map: mapName, x: chunkX, y: chunkY }
     });
 
-    // Timeout after 10 seconds
     setTimeout(() => {
       if (socketModule.pendingMapChunkRequests.has(chunkKey)) {
         socketModule.pendingMapChunkRequests.delete(chunkKey);
@@ -469,7 +413,6 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
   const pixelWidth = chunkData.width * window.mapData.tilewidth;
   const pixelHeight = chunkData.height * window.mapData.tileheight;
 
-  // Create two canvases for proper z-ordering
   const lowerCanvas = document.createElement("canvas");
   const upperCanvas = document.createElement("canvas");
 
@@ -488,17 +431,13 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
   lowerCtx.clearRect(0, 0, pixelWidth, pixelHeight);
   upperCtx.clearRect(0, 0, pixelWidth, pixelHeight);
 
-  // Sort layers by zIndex
   const sortedLayers = [...chunkData.layers].sort((a, b) => a.zIndex - b.zIndex);
 
-  // Player z-index threshold: layers 0-2 go below, layers 3+ go above
   const PLAYER_Z_INDEX = 3;
 
-  // Draw each layer to appropriate canvas
   for (let layerIdx = 0; layerIdx < sortedLayers.length; layerIdx++) {
     const layer = sortedLayers[layerIdx];
 
-    // Skip collision and no-pvp layers - they're only for debug visualization
     const layerName = layer.name ? layer.name.toLowerCase() : '';
     if (layerName.includes('collision') || layerName.includes('nopvp') || layerName.includes('no-pvp')) {
       continue;
@@ -506,7 +445,6 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
 
     const ctx = layer.zIndex < PLAYER_Z_INDEX ? lowerCtx : upperCtx;
 
-    // Process tiles in batches to avoid blocking
     const BATCH_SIZE = 100;
     let tileCount = 0;
 
@@ -538,11 +476,11 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
             window.mapData.tilewidth, window.mapData.tileheight
           );
         } catch (drawError) {
-          console.error("Error drawing tile:", drawError);
+            console.error(`Error drawing tile at (${x}, ${y}) in layer "${layer.name}":`, drawError);
         }
 
         tileCount++;
-        // Yield to browser every BATCH_SIZE tiles to prevent lag
+
         if (tileCount % BATCH_SIZE === 0) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }

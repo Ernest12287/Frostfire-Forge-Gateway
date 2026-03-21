@@ -1,4 +1,4 @@
-// Check if user is logged in
+
 function getCookie(name: string): string | undefined {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -7,13 +7,13 @@ function getCookie(name: string): string | undefined {
 
 const token = getCookie('token');
 if (!token) {
-    // Not logged in, redirect to login
+
     window.location.href = '/';
 }
 
 let selectedServerId: string | null = null;
 let servers: any[] = [];
-let serverPings = new Map<string, number>(); // Store measured pings for each server
+const serverPings = new Map<string, number>();
 
 async function measureServerPing(server: any): Promise<number | null> {
     try {
@@ -34,16 +34,16 @@ async function measureServerPing(server: any): Promise<number | null> {
             return ping;
         }
     } catch (error) {
-        // Silently fail - server might be unreachable
+        console.error(`Failed to ping server ${server.id}:`, error);
     }
     return null;
 }
 
 async function measureAllPings(): Promise<void> {
-    // Measure ping for all online servers (exclude offline only)
+
     const onlineServers = servers.filter(s => s.status !== 'offline');
     await Promise.all(onlineServers.map(server => measureServerPing(server)));
-    renderServers(); // Re-render with updated pings
+    renderServers();
 }
 
 async function loadServers(): Promise<void> {
@@ -59,7 +59,6 @@ async function loadServers(): Promise<void> {
 
         renderServers();
 
-        // Start measuring pings in background
         measureAllPings();
     } catch (error) {
         const loadingEl = document.getElementById('loading-message');
@@ -85,14 +84,11 @@ function renderServers(): void {
     }
 
     realmList.innerHTML = servers.map(server => {
-        const status = server.status; // online, offline, or full
-        const connectionsPercentage = ((server.activeConnections / server.maxConnections) * 100).toFixed(0);
+        const status = server.status;
 
-        // Extract subdomain (realm name) from publicHost and capitalize first letter
         const subdomain = server.publicHost.split('.')[0];
         const realmName = subdomain.charAt(0).toUpperCase() + subdomain.slice(1);
 
-        // Map status to visual style
         let statusClass = 'healthy';
         let statusText = 'Online';
 
@@ -104,7 +100,6 @@ function renderServers(): void {
             statusText = 'Full';
         }
 
-        // Use client-measured ping if available, otherwise show "measuring..."
         const clientPing = serverPings.get(server.id);
         const latencyDisplay = clientPing !== undefined
             ? `${clientPing}ms`
@@ -129,7 +124,6 @@ function renderServers(): void {
         `;
     }).join('');
 
-    // Add click handlers
     document.querySelectorAll('.realm-card').forEach(card => {
         card.addEventListener('click', () => {
             document.querySelectorAll('.realm-card').forEach(c => c.classList.remove('selected'));
@@ -143,10 +137,10 @@ function renderServers(): void {
 
 function continueToGame(serverId: string | null): void {
     if (serverId) {
-        // Store selected server for socket.ts to use
+
         localStorage.setItem('selectedServerId', serverId);
     } else {
-        // Clear selection for round-robin
+
         localStorage.removeItem('selectedServerId');
     }
     window.location.href = '/game';
@@ -161,5 +155,4 @@ document.getElementById('skip-link')?.addEventListener('click', (e) => {
     continueToGame(null);
 });
 
-// Load servers on page load
 loadServers();

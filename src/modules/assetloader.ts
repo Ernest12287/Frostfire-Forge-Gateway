@@ -4,15 +4,12 @@ import log from "./logger";
 import assetCache from "../services/assetCache";
 import zlib from "zlib";
 
-// Hard-coded asset paths
 const assetPath = path.join(import.meta.dir, "..", "webserver", "public");
 const TILESETS_PATH = "tilesets";
 const MAPS_PATH = "maps";
 
-// Start total asset loading timer
 const assetLoadingStartTime = performance.now();
 
-// Load tilesets
 async function loadTilesets() {
   const now = performance.now();
   const tilesets = [] as TilesetData[];
@@ -24,9 +21,9 @@ async function loadTilesets() {
 
   const tilesetFiles = fs.readdirSync(tilesetDir);
   tilesetFiles.forEach((file) => {
-    // Read raw file as Buffer
+
     const tilesetData = fs.readFileSync(path.join(tilesetDir, file));
-    // Compress using gzip
+
     const compressedData = zlib.gzipSync(tilesetData);
 
     const originalSize = tilesetData.length;
@@ -44,19 +41,17 @@ async function loadTilesets() {
     tilesets.push({ name: file, data: compressedData });
   });
 
-  // Store as Base64 strings to work with JSON.stringify in Redis
   await assetCache.add(
     "tilesets",
     tilesets.map(t => ({
       name: t.name,
-      data: t.data.toString("base64") // encode buffer as base64
+      data: t.data.toString("base64")
     }))
   );
 
   log.success(`Loaded ${tilesets.length} tileset(s) in ${(performance.now() - now).toFixed(2)}ms`);
 }
 
-// Load maps
 function loadAllMaps() {
   const now = performance.now();
   const mapDir = path.join(assetPath, MAPS_PATH);
@@ -114,7 +109,6 @@ function tryParse(data: string): any {
   }
 }
 
-// Export initialization function
 export async function initializeAssets() {
   await loadTilesets();
   loadAllMaps();
@@ -124,7 +118,6 @@ export async function initializeAssets() {
   log.success(`✔ All assets loaded successfully in ${totalAssetLoadingTime}ms`);
 }
 
-// Types
 interface TilesetData {
   name: string;
   data: Buffer;

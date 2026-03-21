@@ -3,25 +3,21 @@ const cache = Cache.getInstance();
 import {cachedPlayerId, sendRequest} from "./socket.js";
 import { friendsList, friendsListSearch } from "./ui.js";
 
-
-
 function updateFriendsList(data: any) {
-    // Check if data has friends array
+
     if (!data?.friends) {
         return;
     }
 
     const list = Array.from(friendsList.querySelectorAll('.friend-name')) as HTMLElement[];
 
-    // Step 1: Remove friends from UI that are no longer in data.friends
     list.forEach((item: HTMLElement) => {
         const name = item.innerText.toLowerCase();
         if (!data.friends.map((f: string) => f.toLowerCase()).includes(name)) {
-            item.parentElement?.remove(); // Remove the whole friend-item div
+            item.parentElement?.remove();
         }
     });
 
-    // Step 2: Add new friends from data.friends if they don't exist in UI
     data.friends.forEach((friend: string) => {
         const exists = list.some(item => item.innerText.toLowerCase() === friend.toLowerCase());
         if (!exists) {
@@ -41,13 +37,11 @@ function updateFriendsList(data: any) {
             friendStatus.innerText = isOnline ? "Online" : "Offline";
             friendElement.appendChild(friendStatus);
 
-            // Create the remove button ("X")
             const removeButton = document.createElement("button");
             removeButton.innerText = "X";
             removeButton.classList.add("remove-friend-button");
             removeButton.classList.add("ui");
 
-            // Add the click event handler
             removeButton.onclick = () => {
                 sendRequest({
                     type: "REMOVE_FRIEND",
@@ -78,7 +72,7 @@ function updateFriendOnlineStatus(friendName: string, isOnline: boolean) {
         }
       }
     });
-    }, 2000); // Delay to ensure the friends list is fully loaded
+    }, 2000);
 }
 
 export { updateFriendsList, updateFriendOnlineStatus, friendsListSearch };

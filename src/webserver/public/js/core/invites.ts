@@ -1,10 +1,10 @@
 import {sendRequest} from "./socket";
 
 export function createInvitationPopup(invitationData: any) {
-  // Check if the popup already exists
+
   const existingPopup = document.getElementById("invitation-popup");
   if (existingPopup) {
-    // If it exists, remove it
+
     existingPopup.remove();
   }
   const popup = document.createElement("div");
@@ -47,12 +47,11 @@ export function createInvitationPopup(invitationData: any) {
         },
       }
     }
-    break;  
+    break;
   }
 
   if (!data) return;
 
-  // Add event listeners for accept and decline buttons
   acceptButton?.addEventListener("click", () => {
     data.data.response = "ACCEPT";
     sendRequest(data);

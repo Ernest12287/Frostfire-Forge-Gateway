@@ -2,17 +2,13 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
-// Hard-coded asset paths (same as assetloader.ts)
 const assetPath = path.join(import.meta.dir, "..", "webserver", "public");
 const MAPS_PATH = "maps";
 
-/**
- * Calculate SHA256 checksum of a file (normalized JSON)
- */
 export function calculateFileChecksum(filePath: string): string {
   try {
     const fileContent = fs.readFileSync(filePath, "utf-8");
-    // Parse and re-stringify with consistent formatting for deterministic checksums
+
     const jsonData = JSON.parse(fileContent);
     const normalizedContent = JSON.stringify(jsonData);
     return crypto.createHash("sha256").update(normalizedContent).digest("hex");
@@ -22,9 +18,6 @@ export function calculateFileChecksum(filePath: string): string {
   }
 }
 
-/**
- * Calculate checksums for all map files
- */
 export function calculateAllMapChecksums(): Record<string, string> {
   const checksums: Record<string, string> = {};
   const mapDir = path.join(assetPath, MAPS_PATH);
@@ -44,9 +37,6 @@ export function calculateAllMapChecksums(): Record<string, string> {
   return checksums;
 }
 
-/**
- * Get a specific map file content
- */
 export function getMapContent(mapName: string): any | null {
   try {
     const mapDir = path.join(assetPath, MAPS_PATH);
@@ -64,9 +54,6 @@ export function getMapContent(mapName: string): any | null {
   }
 }
 
-/**
- * Write updated map content to file
- */
 export function writeMapContent(mapName: string, mapData: any): boolean {
   try {
     const mapDir = path.join(assetPath, MAPS_PATH);

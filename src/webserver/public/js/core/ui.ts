@@ -71,7 +71,6 @@ const hotbarSlots = hotbarGrid.querySelectorAll(".slot") as NodeListOf<HTMLDivEl
 const castbar = document.getElementById("castbar") as HTMLDivElement;
 const adminPanelContainer = document.getElementById("admin-panel-container") as HTMLDivElement;
 
-// Add click support to hotbar slots
 hotbarSlots.forEach((slot, index) => {
   slot.addEventListener("click", (event) => {
     event.preventDefault();
@@ -79,7 +78,6 @@ hotbarSlots.forEach((slot, index) => {
   });
 });
 
-// Function to build hotbar configuration and save to server
 function saveHotbarConfiguration() {
   const hotbarConfig: { [key: string]: string | null } = {};
 
@@ -88,19 +86,16 @@ function saveHotbarConfiguration() {
     hotbarConfig[index.toString()] = spellName || null;
   });
 
-  // Send configuration to server
   sendRequest({
     type: "SAVE_HOTBAR",
     data: hotbarConfig
   });
 }
 
-// Add drag-and-drop support to hotbar slots
-// Track if a successful hotbar-to-hotbar drop occurred
 let successfulHotbarDrop = false;
 
 hotbarSlots.forEach((slot, index) => {
-  // Make hotbar slots draggable when shift is held
+
   slot.addEventListener("mousedown", (event: MouseEvent) => {
     if (event.shiftKey && slot.dataset.spellName) {
       slot.draggable = true;
@@ -109,18 +104,16 @@ hotbarSlots.forEach((slot, index) => {
     }
   });
 
-  // Handle drag start from hotbar slot
   slot.addEventListener("dragstart", (event: DragEvent) => {
     if (!event.shiftKey || !slot.dataset.spellName) {
       event.preventDefault();
       return;
     }
 
-    // Reset the flag at the start of each drag
     successfulHotbarDrop = false;
 
     if (event.dataTransfer) {
-      // Mark this as a hotbar-to-hotbar drag
+
       event.dataTransfer.setData("hotbar-source-index", index.toString());
       event.dataTransfer.setData("text/plain", slot.dataset.spellName);
 
@@ -134,40 +127,34 @@ hotbarSlots.forEach((slot, index) => {
     }
   });
 
-  // Handle drag end to detect if spell was dragged off hotbar
   slot.addEventListener("dragend", (event: DragEvent) => {
     slot.style.opacity = "1";
     slot.draggable = false;
 
-    // Only clear if dropped outside hotbar and wasn't a successful hotbar-to-hotbar drop
     if (!successfulHotbarDrop && event.dataTransfer && event.dataTransfer.dropEffect === "none") {
-      // Clear the slot since it was dragged off
+
       delete slot.dataset.spellName;
       slot.innerHTML = "";
       saveHotbarConfiguration();
     }
 
-    // Reset the flag after handling dragend
     successfulHotbarDrop = false;
   });
 
-  // Prevent default drag over behavior
   slot.addEventListener("dragover", (event: DragEvent) => {
     event.preventDefault();
     if (event.dataTransfer) {
-      // Check if dragging from another hotbar slot
+
       const isHotbarDrag = event.dataTransfer.types.includes("hotbar-source-index");
       event.dataTransfer.dropEffect = isHotbarDrag ? "move" : "copy";
     }
     slot.style.backgroundColor = "rgba(255, 255, 255, 0.2)";
   });
 
-  // Remove highlight when drag leaves
   slot.addEventListener("dragleave", () => {
     slot.style.backgroundColor = "";
   });
 
-  // Handle drop
   slot.addEventListener("drop", (event: DragEvent) => {
     event.preventDefault();
     slot.style.backgroundColor = "";
@@ -178,16 +165,14 @@ hotbarSlots.forEach((slot, index) => {
       const imageSrc = event.dataTransfer.getData("image/src");
 
       if (spellName) {
-        // Check if this is a hotbar-to-hotbar drag (swap operation)
+
         if (sourceIndex !== "" && sourceIndex !== index.toString()) {
           const sourceSlot = hotbarSlots[parseInt(sourceIndex)];
 
-          // Store target slot's current spell (if any)
           const targetSpellName = slot.dataset.spellName;
           const targetImg = slot.querySelector("img") as HTMLImageElement;
           const targetImageSrc = targetImg ? targetImg.src : null;
 
-          // Move source spell to target slot
           slot.dataset.spellName = spellName;
           slot.innerHTML = "";
 
@@ -200,9 +185,8 @@ hotbarSlots.forEach((slot, index) => {
             slot.innerText = spellName;
           }
 
-          // Move target spell to source slot (or clear if empty)
           if (targetSpellName && targetSpellName !== "") {
-            // Swap: move target spell to source slot
+
             sourceSlot.dataset.spellName = targetSpellName;
             sourceSlot.innerHTML = "";
 
@@ -215,15 +199,14 @@ hotbarSlots.forEach((slot, index) => {
               sourceSlot.innerText = targetSpellName;
             }
           } else {
-            // Target was empty, so clear source slot and mark it as empty
+
             delete sourceSlot.dataset.spellName;
             sourceSlot.innerHTML = "";
           }
 
-          // Mark this as a successful hotbar-to-hotbar drop
           successfulHotbarDrop = true;
         } else {
-          // Regular drag from spellbook to hotbar
+
           slot.dataset.spellName = spellName;
           slot.innerHTML = "";
 
@@ -237,28 +220,24 @@ hotbarSlots.forEach((slot, index) => {
           }
         }
 
-        // Save hotbar configuration to server
         saveHotbarConfiguration();
       }
     }
   });
 
-  // Right-click to clear hotbar slot
   slot.addEventListener("contextmenu", (event: MouseEvent) => {
     event.preventDefault();
 
     if (slot.dataset.spellName) {
-      // Clear the slot
+
       delete slot.dataset.spellName;
       slot.innerHTML = "";
 
-      // Save updated configuration
       saveHotbarConfiguration();
     }
   });
 });
 
-// Track active castbar clone
 let activeCastbarClone: HTMLDivElement | null = null;
 
 function toggleUI(element: HTMLElement, toggleFlag: boolean, hidePosition: number) {
@@ -272,13 +251,13 @@ function toggleDebugContainer() {
 }
 
 function handleStatsUI() {
-  // If stat sheet is open
+
   if (statUI.style.left === "10px") {
-    // Close it (whether it's showing current player or inspected player)
+
     statUI.style.transition = "1s";
     statUI.style.left = "-600";
   } else {
-    // If closed, open it with current player's stats
+
     sendRequest({ type: "INSPECTPLAYER", data: null });
   }
 }
@@ -287,7 +266,6 @@ function createPartyUI(partyMembers: string[], players?: any[]) {
   const partyContainer = document.getElementById("party-container");
   if (!partyContainer) return;
 
-  // If no party members, remove all current ones and exit
   if (partyMembers.length === 0) {
     const existingMembers = partyContainer.querySelectorAll(".party-member");
     existingMembers.forEach(member => partyContainer.removeChild(member));
@@ -311,17 +289,14 @@ function createPartyUI(partyMembers: string[], players?: any[]) {
 
   const desiredNames = new Set(partyMembers.map(name => name.toLowerCase()));
 
-  // Remove members no longer in the list
   for (const [name, el] of existingNames.entries()) {
     if (!desiredNames.has(name)) {
       partyContainer.removeChild(el);
     }
   }
 
-  // Sort alphabetically by username
   partyMembers.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
-  // Add new members
   for (const member of partyMembers) {
     const lowerName = member.toLowerCase();
     if (!existingNames.has(lowerName)) {
@@ -333,11 +308,9 @@ function createPartyUI(partyMembers: string[], players?: any[]) {
       usernameElement.className = "party-member-username ui";
       usernameElement.innerText = member.charAt(0).toUpperCase() + member.slice(1);
 
-      // Create bars container
       const barsContainer = document.createElement("div");
       barsContainer.className = "party-member-bars ui";
 
-      // Create health bar
       const healthBarContainer = document.createElement("div");
       healthBarContainer.className = "party-member-health-bar ui";
       const healthProgress = document.createElement("div");
@@ -345,7 +318,6 @@ function createPartyUI(partyMembers: string[], players?: any[]) {
       healthProgress.style.setProperty("--health-scale", "1");
       healthBarContainer.appendChild(healthProgress);
 
-      // Create stamina bar
       const staminaBarContainer = document.createElement("div");
       staminaBarContainer.className = "party-member-stamina-bar ui";
       const staminaProgress = document.createElement("div");
@@ -360,7 +332,6 @@ function createPartyUI(partyMembers: string[], players?: any[]) {
       memberElement.appendChild(barsContainer);
       partyContainer.appendChild(memberElement);
 
-      // Initialize bars with current stats if player data is available
       if (players) {
         const playerData = players.find(p => p.username?.toLowerCase() === lowerName);
         if (playerData?.stats) {
@@ -396,7 +367,6 @@ function updatePartyMemberStats(username: string, health: number, maxHealth: num
     const healthScale = Math.max(0, Math.min(1, health / maxHealth));
     healthProgress.style.setProperty("--health-scale", healthScale.toString());
 
-    // Update color based on health percentage
     let colorClass = "green";
     if (healthPercent < 30) {
       colorClass = "red";
@@ -431,7 +401,6 @@ function updateHealthBar(bar: HTMLDivElement, healthPercent: number) {
     fill: 'forwards'
   });
 
-  // Avoid clearing and re-adding class if unnecessary
   let colorClass = "green";
   if (healthPercent < 30) {
     colorClass = "red";
@@ -450,7 +419,6 @@ function updateHealthBar(bar: HTMLDivElement, healthPercent: number) {
     bar.classList.add(colorClass);
   }
 
-  // Ensure base class is set
   if (!bar.classList.contains("ui")) {
     bar.classList.add("ui");
   }
@@ -468,14 +436,14 @@ function updateStaminaBar(bar: HTMLDivElement, staminaPercent: number) {
 
 function castSpell(id: string, spell: string, time: number) {
   spell = spell.toLowerCase();
-  // Handle other players' casting (show castbar above their head)
+
   if (id !== cachedPlayerId) {
     const cache = Cache.getInstance();
     const player = Array.from(cache.players).find(p => p.id === id);
 
     if (player) {
       if (spell === 'interrupted' || spell === 'failed') {
-        // Calculate current progress before interrupting
+
         if (player.castingSpell && !player.castingInterrupted) {
           const elapsed = performance.now() - player.castingStartTime;
           player.castingInterruptedProgress = Math.min(elapsed / player.castingDuration, 1);
@@ -483,13 +451,12 @@ function castSpell(id: string, spell: string, time: number) {
           player.castingInterruptedProgress = 0;
         }
 
-        // Update spell name to show what failed/interrupted
         player.castingSpell = spell.charAt(0).toUpperCase() + spell.slice(1);
         player.castingInterrupted = true;
         player.castingStartTime = performance.now();
-        player.castingDuration = 1500; // Show interrupted/failed for 1.5 seconds
+        player.castingDuration = 1500;
       } else {
-        // Format spell name (capitalize and remove underscores)
+
         const formattedSpell = spell.split('_').map(word =>
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ');
@@ -504,14 +471,13 @@ function castSpell(id: string, spell: string, time: number) {
     return;
   }
 
-  // Current player casting (DOM-based castbar at bottom of screen)
   let currentProgress = 0;
   if (activeCastbarClone && (spell == 'interrupted' || spell == 'failed')) {
     if (spell == 'failed') {
-      // Failed always shows at 100%
+
       currentProgress = 1.0;
     } else {
-      // Interrupted shows at current progress
+
       const cloneProgress = activeCastbarClone.querySelector("#castbar-progress") as HTMLDivElement;
       if (cloneProgress) {
         const animations = cloneProgress.getAnimations();
@@ -529,18 +495,16 @@ function castSpell(id: string, spell: string, time: number) {
     }
   }
 
-  // Remove any existing active clone
   if (activeCastbarClone) {
     activeCastbarClone.remove();
     activeCastbarClone = null;
   }
 
   if (spell == 'interrupted' || spell == 'failed') {
-    // Create interrupt clone
+
     const interruptClone = castbar.cloneNode(true) as HTMLDivElement;
     interruptClone.id = "castbar-active-clone";
 
-    // Set display and positioning for the interrupt clone
     interruptClone.style.display = "block";
     interruptClone.style.position = "fixed";
     interruptClone.style.bottom = "200px";
@@ -550,16 +514,15 @@ function castSpell(id: string, spell: string, time: number) {
     interruptClone.style.height = "25px";
     interruptClone.style.zIndex = "100";
 
-    // Get children directly (first child is progress, second is text based on HTML)
     const children = interruptClone.children;
     const clonedProgress = children[0] as HTMLDivElement;
     const clonedText = children[1] as HTMLDivElement;
 
     if (clonedProgress && clonedText) {
-      // Set to current progress and color based on type
+
       clonedProgress.style.transform = `scaleX(${currentProgress})`;
       clonedProgress.style.transformOrigin = 'left';
-      // Professional colors: red gradient for failed, grey gradient for interrupted
+
       if (spell === 'failed') {
         clonedProgress.style.background = 'linear-gradient(180deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%)';
         clonedProgress.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.2), inset 0 -2px 4px rgba(0, 0, 0, 0.3)';
@@ -569,15 +532,12 @@ function castSpell(id: string, spell: string, time: number) {
       }
       clonedText.innerText = spell;
 
-      // Clear any animations
       clonedProgress.getAnimations().forEach(anim => anim.cancel());
     }
 
-    // Insert the interrupt clone
     castbar.parentNode?.insertBefore(interruptClone, castbar.nextSibling);
     activeCastbarClone = interruptClone;
 
-    // Remove after delay
     setTimeout(() => {
       if (activeCastbarClone === interruptClone) {
         interruptClone.remove();
@@ -588,18 +548,15 @@ function castSpell(id: string, spell: string, time: number) {
     return;
   }
 
-  // Normal spell cast - create a new clone for this cast
   const castClone = castbar.cloneNode(true) as HTMLDivElement;
   castClone.id = "castbar-active-clone";
 
-  // Get children directly (first child is progress, second is text based on HTML)
   const children = castClone.children;
   const clonedProgress = children[0] as HTMLDivElement;
   const clonedText = children[1] as HTMLDivElement;
 
-
   if (clonedProgress && clonedText) {
-    // Set display to block and copy essential positioning styles
+
     castClone.style.display = "block";
     castClone.style.position = "fixed";
     castClone.style.bottom = "200px";
@@ -609,18 +566,15 @@ function castSpell(id: string, spell: string, time: number) {
     castClone.style.height = "25px";
     castClone.style.zIndex = "100";
 
-    // Reset progress to 0 and ensure gradient is used
     clonedProgress.style.transform = 'scaleX(0)';
     clonedProgress.style.transformOrigin = 'left';
     clonedProgress.style.background = '';
 
-    // Format spell name
     const formattedSpell = spell.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     clonedText.innerText = formattedSpell;
 
     const timeMs = time * 1000;
 
-    // Animate the clone
     clonedProgress.animate([
       { transform: 'scaleX(0)' },
       { transform: 'scaleX(1)' }
@@ -632,7 +586,6 @@ function castSpell(id: string, spell: string, time: number) {
     castbar.parentNode?.insertBefore(castClone, castbar.nextSibling);
     activeCastbarClone = castClone;
 
-    // Remove after cast completes
     setTimeout(() => {
       if (activeCastbarClone === castClone) {
         castClone.remove();
@@ -642,7 +595,6 @@ function castSpell(id: string, spell: string, time: number) {
   }
 }
 
-// Function to load hotbar configuration from server
 function saveInventoryConfiguration() {
   const inventoryConfig: { [key: string]: string | null } = {};
   const inventorySlots = inventoryGrid.querySelectorAll(".slot");
@@ -652,7 +604,6 @@ function saveInventoryConfiguration() {
     inventoryConfig[index.toString()] = itemName || null;
   });
 
-  // Send configuration to server
   sendRequest({
     type: "SAVE_INVENTORY_CONFIG",
     data: inventoryConfig
@@ -660,17 +611,15 @@ function saveInventoryConfiguration() {
 }
 
 async function loadInventoryConfiguration(inventoryConfig: any, inventoryData: any[]) {
-  // Create a map of items by name for quick lookup
+
   const itemMap: { [key: string]: any } = {};
   inventoryData.forEach(item => {
     itemMap[item.name] = item;
   });
 
-  // Return sorted inventory data based on saved configuration
   const sortedInventory: any[] = [];
   const usedItems = new Set<string>();
 
-  // First, add items in the configured order
   Object.keys(inventoryConfig).sort((a, b) => parseInt(a) - parseInt(b)).forEach(index => {
     const itemName = inventoryConfig[index];
     if (itemName && itemMap[itemName] && !usedItems.has(itemName)) {
@@ -679,7 +628,6 @@ async function loadInventoryConfiguration(inventoryConfig: any, inventoryData: a
     }
   });
 
-  // Then add any items not in the configuration
   inventoryData.forEach(item => {
     if (!usedItems.has(item.name)) {
       sortedInventory.push(item);
@@ -691,7 +639,6 @@ async function loadInventoryConfiguration(inventoryConfig: any, inventoryData: a
 
 async function loadHotbarConfiguration(hotbarConfig: any) {
 
-  // Wait for spellbook images to be loaded
   const waitForSpellbookImages = async (maxAttempts = 50, delayMs = 100) => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const spellbookSpells = document.querySelectorAll("#spell-book-container #grid .slot") as NodeListOf<HTMLDivElement>;
@@ -709,7 +656,6 @@ async function loadHotbarConfiguration(hotbarConfig: any) {
 
   await waitForSpellbookImages();
 
-  // Build spell image map from spellbook
   const spellbookSpells = document.querySelectorAll("#spell-book-container #grid .slot") as NodeListOf<HTMLDivElement>;
   const spellImageMap: { [key: string]: string } = {};
 
@@ -721,21 +667,17 @@ async function loadHotbarConfiguration(hotbarConfig: any) {
     }
   });
 
-  // Load hotbar slots
   hotbarSlots.forEach((slot, index) => {
     const slotData = hotbarConfig[index.toString()];
 
-    // Handle both string format "fireball" and object format { name: "fireball" }
     const spellName = typeof slotData === 'string' ? slotData : slotData?.name;
 
     if (spellName) {
-      // Store spell name in data attribute
+
       slot.dataset.spellName = spellName;
 
-      // Clear existing content
       slot.innerHTML = "";
 
-      // Use image from spellbook if available
       const imageSrc = spellImageMap[spellName];
       if (imageSrc) {
         const iconImage = new Image();
@@ -743,18 +685,17 @@ async function loadHotbarConfiguration(hotbarConfig: any) {
         iconImage.draggable = false;
         slot.appendChild(iconImage);
       } else {
-        // Fallback to spell name text
+
         slot.innerText = spellName;
       }
     } else {
-      // Clear the slot
+
       delete slot.dataset.spellName;
       slot.innerHTML = "";
     }
   });
 }
 
-// Setup admin panel button event handlers and player list
 const adminPlayerSelect = document.getElementById("admin-player-select") as HTMLSelectElement;
 const adminNoclipButton = document.getElementById("admin-noclip");
 const adminStealthButton = document.getElementById("admin-stealth");
@@ -774,29 +715,24 @@ const adminBroadcastAllButton = document.getElementById("admin-broadcast-all");
 const adminBroadcastMapButton = document.getElementById("admin-broadcast-map");
 const adminBroadcastAdminsButton = document.getElementById("admin-broadcast-admins");
 
-// Function to update map input with current map name
 function updateAdminMapInput() {
   if (!adminMapInput) return;
 
-  // Get current map name from window.mapData
   if ((window as any).mapData && (window as any).mapData.name) {
     const mapName = (window as any).mapData.name;
-    // Remove .json extension if present
+
     const displayName = mapName.replace(/\.json$/i, '');
     adminMapInput.placeholder = `Current map: ${displayName}`;
   }
 }
 
-// Function to update admin player list with data from server
 function updateAdminPlayerListWithData(players: Array<{ username: string; map: string; isAdmin: boolean }>) {
   if (!adminPlayerSelect) return;
 
   const currentSelection = adminPlayerSelect.value;
 
-  // Clear existing options except the first one
   adminPlayerSelect.innerHTML = '<option value="">Select a player...</option>';
 
-  // Add all players with map info
   players.forEach((player) => {
     if (player.username) {
       const option = document.createElement("option");
@@ -807,7 +743,6 @@ function updateAdminPlayerListWithData(players: Array<{ username: string; map: s
     }
   });
 
-  // Restore selection if player still exists
   if (currentSelection) {
     const exists = players.some((p) => p.username === currentSelection);
     if (exists) {
@@ -816,17 +751,14 @@ function updateAdminPlayerListWithData(players: Array<{ username: string; map: s
   }
 }
 
-// Function to request online players from server
 function requestOnlinePlayers() {
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
 }
 
-// Helper function to get selected player
 function getSelectedPlayer(): string {
   return adminPlayerSelect?.value || "";
 }
 
-// Helper function to send command
 function sendAdminCommand(command: string, args: string[] = []) {
   const fullCommand = args.length > 0 ? `${command} ${args.join(" ")}` : command;
   sendRequest({
@@ -835,7 +767,6 @@ function sendAdminCommand(command: string, args: string[] = []) {
   });
 }
 
-// Helper function to show notification
 function showAdminNotification(message: string) {
   if (!notificationContainer || !notificationMessage) return;
   notificationMessage.innerText = message;
@@ -847,7 +778,6 @@ function showAdminNotification(message: string) {
   }, 3000);
 }
 
-// Self commands
 if (adminNoclipButton) {
   adminNoclipButton.addEventListener("click", () => {
     sendRequest({ type: "NOCLIP", data: null });
@@ -860,7 +790,6 @@ if (adminStealthButton) {
   });
 }
 
-// Player commands
 if (adminSummonButton) {
   adminSummonButton.addEventListener("click", () => {
     const player = getSelectedPlayer();
@@ -938,14 +867,13 @@ if (adminToggleAdminButton) {
   });
 }
 
-// Server commands
 if (adminReloadMapButton) {
   adminReloadMapButton.addEventListener("click", () => {
-    // Get map name from input or use current map
+
     let mapName = adminMapInput?.value.trim();
 
     if (!mapName) {
-      // Use current map if no input provided
+
       if ((window as any).mapData && (window as any).mapData.name) {
         mapName = (window as any).mapData.name.replace(/\.json$/i, '');
       }
@@ -960,7 +888,6 @@ if (adminReloadMapButton) {
   });
 }
 
-// Warp command
 if (adminWarpButton) {
   adminWarpButton.addEventListener("click", () => {
     const mapName = adminWarpInput?.value.trim();
@@ -972,14 +899,12 @@ if (adminWarpButton) {
 
     sendAdminCommand("warp", [mapName]);
 
-    // Clear the input after warping
     if (adminWarpInput) {
       adminWarpInput.value = "";
     }
   });
 }
 
-// Broadcast commands
 if (adminBroadcastAllButton) {
   adminBroadcastAllButton.addEventListener("click", () => {
     const message = adminBroadcastInput?.value.trim();
@@ -1030,20 +955,17 @@ export {
     updateAdminMapInput, updateAdminPlayerListWithData,
 };
 
-// Function to update currency display
 function updateCurrencyDisplay() {
   const cache = Cache.getInstance();
 
   if (!cachedPlayerId) return;
 
-  // Get current player from cache
   const currentPlayer = Array.from(cache.players).find(
     (p) => p.id === cachedPlayerId
   );
 
   if (!currentPlayer || !currentPlayer.currency) return;
 
-  // Update currency amounts
   const goldElement = document.getElementById("currency-gold");
   const silverElement = document.getElementById("currency-silver");
   const copperElement = document.getElementById("currency-copper");
@@ -1053,15 +975,14 @@ function updateCurrencyDisplay() {
   if (copperElement) copperElement.textContent = currentPlayer.currency.copper.toString();
 }
 
-// Function to setup inventory slot drag and drop handlers
 function setupInventorySlotHandlers() {
   const inventorySlots = inventoryGrid.querySelectorAll(".slot") as NodeListOf<HTMLDivElement>;
 
   inventorySlots.forEach((slot, index) => {
-    // Double-click to equip (for equipment items)
+
     slot.addEventListener("dblclick", () => {
       if (slot.dataset.itemType === "equipment" && slot.dataset.itemName) {
-        // Hide tooltip when equipping
+
         hideItemTooltip();
 
         sendRequest({
@@ -1071,14 +992,12 @@ function setupInventorySlotHandlers() {
       }
     });
 
-    // Dragstart handler
     slot.addEventListener("dragstart", (event: DragEvent) => {
       if (!slot.draggable) {
         event.preventDefault();
         return;
       }
 
-      // Hide tooltip when starting to drag
       hideItemTooltip();
 
       if (event.dataTransfer) {
@@ -1089,7 +1008,6 @@ function setupInventorySlotHandlers() {
           event.dataTransfer.setData("inventory-item-name", itemName);
         }
 
-        // If equipment type, also set equipment data
         if (slot.dataset.itemType === "equipment" && slot.dataset.equipmentSlot) {
           event.dataTransfer.setData("equipment-slot", slot.dataset.equipmentSlot);
         }
@@ -1099,12 +1017,10 @@ function setupInventorySlotHandlers() {
       }
     });
 
-    // Dragend handler
     slot.addEventListener("dragend", () => {
       slot.style.opacity = "1";
     });
 
-    // Dragover handler
     slot.addEventListener("dragover", (event: DragEvent) => {
       event.preventDefault();
       if (event.dataTransfer) {
@@ -1116,23 +1032,21 @@ function setupInventorySlotHandlers() {
       }
     });
 
-    // Dragleave handler
     slot.addEventListener("dragleave", () => {
       slot.style.border = "";
     });
 
-    // Drop handler
     slot.addEventListener("drop", (event: DragEvent) => {
       event.preventDefault();
       slot.style.border = "";
 
       if (event.dataTransfer) {
-        // Check if dragging from equipment slot
+
         const equippedItemSlot = event.dataTransfer.getData("equipped-item-slot");
         const equippedItemName = event.dataTransfer.getData("equipped-item-name");
 
         if (equippedItemSlot && equippedItemName) {
-          // Unequipping item to this inventory slot
+
           sendRequest({
             type: "UNEQUIP_ITEM",
             data: { slot: equippedItemSlot, targetSlotIndex: index },
@@ -1145,7 +1059,6 @@ function setupInventorySlotHandlers() {
         if (sourceIndex !== "" && sourceIndex !== index.toString()) {
           const sourceSlot = inventorySlots[parseInt(sourceIndex)];
 
-          // Store target slot's current item data
           const targetItemName = slot.dataset.itemName;
           const targetItemType = slot.dataset.itemType;
           const targetEquipmentSlot = slot.dataset.equipmentSlot;
@@ -1154,7 +1067,6 @@ function setupInventorySlotHandlers() {
           const targetHTML = slot.innerHTML;
           const targetClasses = Array.from(slot.classList).filter(c => c !== "slot" && c !== "ui");
 
-          // Move source item to target slot
           slot.innerHTML = "";
           slot.className = "slot ui";
 
@@ -1169,7 +1081,6 @@ function setupInventorySlotHandlers() {
             slot.appendChild(newImg);
           }
 
-          // Copy source item's quantity label if it exists
           const sourceQuantityLabel = sourceSlot.querySelector(".quantity-label");
           if (sourceQuantityLabel) {
             const newQuantityLabel = sourceQuantityLabel.cloneNode(true) as HTMLElement;
@@ -1177,7 +1088,6 @@ function setupInventorySlotHandlers() {
             slot.appendChild(newQuantityLabel);
           }
 
-          // Copy source item's datasets and classes
           if (sourceSlot.dataset.itemName) slot.dataset.itemName = sourceSlot.dataset.itemName;
           if (sourceSlot.dataset.itemType) slot.dataset.itemType = sourceSlot.dataset.itemType;
           if (sourceSlot.dataset.equipmentSlot) slot.dataset.equipmentSlot = sourceSlot.dataset.equipmentSlot;
@@ -1188,7 +1098,6 @@ function setupInventorySlotHandlers() {
 
           slot.draggable = true;
 
-          // Re-attach tooltip to target slot with moved item
           const cache = Cache.getInstance();
           removeItemTooltip(slot);
           setupItemTooltip(slot, () => {
@@ -1197,12 +1106,11 @@ function setupInventorySlotHandlers() {
             return cache.inventory.find((invItem: any) => invItem.name === itemName);
           });
 
-          // Move target item to source slot (or clear if empty)
           sourceSlot.innerHTML = "";
           sourceSlot.className = "slot ui";
 
           if (targetItemName) {
-            // Swap: move target item to source slot
+
             if (targetImgSrc) {
               const newImg = new Image();
               newImg.src = targetImgSrc;
@@ -1212,7 +1120,6 @@ function setupInventorySlotHandlers() {
               newImg.style.pointerEvents = "none";
               sourceSlot.appendChild(newImg);
 
-              // Copy quantity label if exists
               const targetQuantityLabel = document.createElement("div");
               const origQuantityLabel = targetHTML.match(/<div class="quantity-label">([^<]+)<\/div>/);
               if (origQuantityLabel) {
@@ -1230,7 +1137,6 @@ function setupInventorySlotHandlers() {
             targetClasses.forEach(cls => sourceSlot.classList.add(cls));
             sourceSlot.draggable = true;
 
-            // Re-attach tooltip to source slot with swapped item
             removeItemTooltip(sourceSlot);
             setupItemTooltip(sourceSlot, () => {
               const itemName = sourceSlot.dataset.itemName;
@@ -1238,18 +1144,16 @@ function setupInventorySlotHandlers() {
               return cache.inventory.find((invItem: any) => invItem.name === itemName);
             });
           } else {
-            // Target was empty, so clear source slot
+
             delete sourceSlot.dataset.itemName;
             delete sourceSlot.dataset.itemType;
             delete sourceSlot.dataset.equipmentSlot;
             sourceSlot.classList.add("empty");
             sourceSlot.draggable = false;
 
-            // Remove tooltip from now-empty source slot
             removeItemTooltip(sourceSlot);
           }
 
-          // Save configuration
           saveInventoryConfiguration();
         }
       }

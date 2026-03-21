@@ -21,7 +21,7 @@ login.addEventListener('click', async () => {
     if (response.status === 200) {
         window.Notify('success', 'Email sent successfully');
     } else if (response.status === 301) {
-        // Player is already verified and logged in
+
         window.location.href = '/realm-selection';
     } else {
         const body = await response.json();
@@ -45,7 +45,6 @@ guestLogin.addEventListener('click', async (event) => {
     }
 });
 
-// Listen for the enter key to click the login button
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         login.click();

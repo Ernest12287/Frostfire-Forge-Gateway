@@ -24,8 +24,8 @@ const pressedKeys = new Set();
 const movementKeys = new Set(["KeyW", "KeyA", "KeyS", "KeyD"]);
 let lastTypingPacket = 0;
 const cooldowns: { [key: string]: number } = {};
-const COOLDOWN_DURATION = 100; // milliseconds
-const KEY_COOLDOWN_DURATION = 500; // milliseconds
+const COOLDOWN_DURATION = 100;
+const KEY_COOLDOWN_DURATION = 500;
 
 export const keyHandlers = {
   F2: () => toggleDebugContainer(),
@@ -33,7 +33,7 @@ export const keyHandlers = {
   KeyB: () => {
     toggleInventory = toggleUI(inventoryUI, toggleInventory, -350);
   },
-  // Spellbook key
+
   KeyP: () => {
     if (toggleFriendsList) {
       toggleFriendsList = toggleUI(friendsListUI, toggleFriendsList, -450);
@@ -164,12 +164,10 @@ export const keyHandlers = {
       toggleInventory = toggleUI(inventoryUI, toggleInventory, -350);
     }
 
-    // Only allow admin panel to be opened by admin players
     const currentPlayer = Array.from(cache.players).find(p => p.id === cachedPlayerId);
     if (currentPlayer?.isAdmin) {
       toggleAdminPanel = toggleUI(adminPanelContainer, toggleAdminPanel, -480);
 
-      // Request fresh player list when opening admin panel
       if (toggleAdminPanel) {
         sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
       }
@@ -177,7 +175,6 @@ export const keyHandlers = {
   }
 } as const;
 
-// Movement keys configuration
 const blacklistedKeys = new Set([
   'ContextMenu',
   'AltLeft',
@@ -203,12 +200,10 @@ function cast(hotbar_index: number) {
     putKeyOnCooldown(`Digit${hotbar_index + 1}`);
     const target = Array.from(cache?.players).find(p => p?.targeted) || null;
 
-    // Get the spell name from the hotbar slot data attribute
     const slot = hotbarSlots[hotbar_index];
     const spellName = slot?.dataset?.spellName;
     if (!spellName) return;
 
-    // Send request with spell name
     sendRequest({
       type: "HOTBAR",
       data: {
@@ -250,11 +245,10 @@ function clearKeyCooldown(key: string) {
 function handleEscapeKey() {
   stopMovement();
   chatInput.blur();
-  
+
   const isPauseMenuVisible = pauseMenu.style.display === "block";
   pauseMenu.style.display = isPauseMenuVisible ? "none" : "block";
-  
-  // Close other menus
+
   menuElements.forEach(elementId => {
     const element = document.getElementById(elementId);
     if (element?.style.display === "block") {
@@ -263,47 +257,47 @@ function handleEscapeKey() {
   });
 }
 addEventListener("keypress", (event: KeyboardEvent) => {
-  // Check if chatinput is focused to avoid interfering with typing
+
   if (chatInput === document.activeElement) {
     const inputValue = chatInput.value.trim();
 
     switch (true) {
       case inputValue === "/party" || inputValue === "/p":
-        // Check for space key to set party chat mode
+
         if (event.key === " ") {
           event.preventDefault();
           chatInput.value = "";
           chatInput.dataset.mode = "party";
           chatInput.style.color = "#86b3ff";
-          // Update placeholder text
+
           chatInput.placeholder = "[Party] Type here...";
-          // Make placeholder the same color as party mode
+
           chatInput.style.setProperty('--chat-placeholder-color', '#86b3ff');
         }
         break;
       case inputValue === "/say" || inputValue === "/s":
-        // Check for space key to set say chat mode
+
         if (event.key === " ") {
           event.preventDefault();
           chatInput.value = "";
-          // Remove any existing mode
+
           delete chatInput.dataset.mode;
           chatInput.style.color = "#FFF1DA";
-          // Reset placeholder text
+
           chatInput.placeholder = "Type here...";
-          // Reset placeholder color
+
           chatInput.style.setProperty('--chat-placeholder-color', '#FFF1DA');
         }
         break;
       case inputValue.startsWith("/whisper ") || inputValue.startsWith("/w "):
-        // Check for space key after whisper command and name
+
         if (event.key === " " && inputValue.split(" ").length >= 2) {
           event.preventDefault();
           const name = inputValue.split(" ")[1];
           chatInput.value = "";
           chatInput.dataset.mode = `whisper ${name}`;
           chatInput.style.color = "#ff59f8";
-          // Update placeholder text
+
           chatInput.placeholder = `[${name}] Type here...`;
           chatInput.style.setProperty('--chat-placeholder-color', '#ff59f8');
         }
@@ -315,7 +309,7 @@ addEventListener("keypress", (event: KeyboardEvent) => {
 });
 
 async function handleEnterKey() {
-  // Check if friendslist search is focused
+
   if (friendsListSearch === document.activeElement) return;
   const isTyping = chatInput === document.activeElement;
 
@@ -357,12 +351,12 @@ function handleKeyPress() {
 }
 
 function stopMovement() {
-  // Send abort packet when chat is opened
+
   sendRequest({
     type: "MOVEXY",
     data: "ABORT",
   });
-  // Clear pressed keys to prevent continued movement
+
   pressedKeys.clear();
   isKeyPressed = false;
   isMoving = false;
@@ -377,11 +371,11 @@ function getIsMoving() {
 }
 
 function getUserHasInteracted() {
-    return userHasInteracted;   
+    return userHasInteracted;
 }
 
 function setUserHasInteracted(value: boolean) {
-    userHasInteracted = value;   
+    userHasInteracted = value;
 }
 
 function getControllerConnected() {
