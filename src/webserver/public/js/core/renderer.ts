@@ -15,6 +15,77 @@ let smoothMapX: number = 0, smoothMapY: number = 0;
 let cameraInitialized: boolean = false;
 import { canvas, ctx, fpsSlider, healthBar, staminaBar, collisionDebugCheckbox, chunkOutlineDebugCheckbox, collisionTilesDebugCheckbox, noPvpDebugCheckbox, wireframeDebugCheckbox, showGridCheckbox, loadedChunksText } from "./ui.js";
 
+const SERVER_TICK_RATE = 30;
+const SERVER_FRAME_TIME = 1000 / SERVER_TICK_RATE;
+const SERVER_SPEED = 6;
+
+let lastMovementTime = 0;
+
+function updateLocalPlayerPrediction(currentPlayer: any, now: number) {
+  if (!currentPlayer) return;
+  
+  const isMoving = getIsMoving() && getIsKeyPressed();
+  
+  if (!isMoving) {
+    return;
+  }
+  
+  const timeSinceLastMove = now - lastMovementTime;
+  if (timeSinceLastMove < SERVER_FRAME_TIME) {
+    return;
+  }
+  lastMovementTime = now - (timeSinceLastMove % SERVER_FRAME_TIME);
+  
+  const keys = pressedKeys;
+  let direction = "";
+  if (keys.has("KeyW") && keys.has("KeyA")) direction = "UPLEFT";
+  else if (keys.has("KeyW") && keys.has("KeyD")) direction = "UPRIGHT";
+  else if (keys.has("KeyS") && keys.has("KeyA")) direction = "DOWNLEFT";
+  else if (keys.has("KeyS") && keys.has("KeyD")) direction = "DOWNRIGHT";
+  else if (keys.has("KeyW")) direction = "UP";
+  else if (keys.has("KeyS")) direction = "DOWN";
+  else if (keys.has("KeyA")) direction = "LEFT";
+  else if (keys.has("KeyD")) direction = "RIGHT";
+  
+  if (!direction) return;
+  
+  const directionOffsets: Record<string, { dx: number; dy: number }> = {
+    up: { dx: 0, dy: -SERVER_SPEED },
+    down: { dx: 0, dy: SERVER_SPEED },
+    left: { dx: -SERVER_SPEED, dy: 0 },
+    right: { dx: SERVER_SPEED, dy: 0 },
+    upleft: { dx: -SERVER_SPEED, dy: -SERVER_SPEED },
+    upright: { dx: SERVER_SPEED, dy: -SERVER_SPEED },
+    downleft: { dx: -SERVER_SPEED, dy: SERVER_SPEED },
+    downright: { dx: SERVER_SPEED, dy: SERVER_SPEED },
+  };
+  
+  const offset = directionOffsets[direction];
+  if (offset) {
+    currentPlayer.position.x += offset.dx;
+    currentPlayer.position.y += offset.dy;
+  }
+}
+
+function updateRemotePlayerInterpolation(player: any, deltaSeconds: number) {
+  if (!player || !player.lastServerUpdate) return;
+  if (player.id === cachedPlayerId) return;
+  
+  const dx = player.serverPosition.x - player.position.x;
+  const dy = player.serverPosition.y - player.position.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  const threshold = 5;
+  const lerpFactor = 0.2 * deltaSeconds * 60;
+  if (distance > threshold) {
+    player.position.x = Math.round(player.position.x + dx * lerpFactor);
+    player.position.y = Math.round(player.position.y + dy * lerpFactor);
+  }
+  
+  player.renderPosition.x = player.position.x;
+  player.renderPosition.y = player.position.y;
+}
+
 canvas.style.position = 'fixed';
 
 declare global {
@@ -303,12 +374,16 @@ function animationLoop() {
 
   if (cache.players instanceof Map) {
     animationManager.updateAllPlayers(cache.players, deltaTime);
+    cache.players.forEach((player: any) => {
+      updateRemotePlayerInterpolation(player, deltaTime);
+    });
   } else if (cache.players instanceof Set) {
 
     const playersMap = new Map<string, any>();
     for (const player of cache.players) {
       if (player && player.id) {
         playersMap.set(player.id, player);
+        updateRemotePlayerInterpolation(player, deltaTime);
       }
     }
     animationManager.updateAllPlayers(playersMap, deltaTime);
@@ -323,6 +398,8 @@ function animationLoop() {
     smoothMapY = initialY;
     cameraInitialized = true;
   }
+
+  updateLocalPlayerPrediction(currentPlayer, now);
 
   updateCamera(currentPlayer, deltaTime * 60);
 

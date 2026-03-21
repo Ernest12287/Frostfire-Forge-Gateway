@@ -13,7 +13,7 @@ import { getVisibleLayersSorted } from "./layeredAnimation.js";
 async function createPlayer(data: any) {
 
   if (data.id === cachedPlayerId) {
-    positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
+    positionText.innerText = `Position: ${Math.round(data.location.x)}, ${Math.round(data.location.y)}`;
   }
 
   updateFriendOnlineStatus(data.username, true);
@@ -66,9 +66,20 @@ async function createPlayer(data: any) {
     lastDirection: "down" as string,
     friends: data.friends || [],
     position: {
-      x: data.location.x,
-      y: data.location.y,
+      x: Math.round(data.location.x),
+      y: Math.round(data.location.y),
     },
+    serverPosition: {
+      x: Math.round(data.location.x),
+      y: Math.round(data.location.y),
+    },
+    renderPosition: {
+      x: Math.round(data.location.x),
+      y: Math.round(data.location.y),
+    },
+    lastServerUpdate: 0,
+    lastInputTime: 0,
+    velocity: { x: 0, y: 0 },
     chat: "",
     isStealth: data.isStealth,
     isAdmin: data.isAdmin,

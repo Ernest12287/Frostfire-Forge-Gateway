@@ -48,7 +48,15 @@ async function measureAllPings(): Promise<void> {
 
 async function loadServers(): Promise<void> {
     try {
-        const response = await fetch('/api/gateway/servers');
+        const loadingEl = document.getElementById('loading-message');
+        if (loadingEl) {
+            loadingEl.innerHTML = 'Loading available realms...';
+        }
+
+        const timestamp = Date.now();
+        const response = await fetch(`/api/gateway/servers?t=${timestamp}`, {
+            cache: 'no-store'
+        });
 
         if (!response.ok) {
             throw new Error('Failed to fetch servers');
@@ -56,6 +64,7 @@ async function loadServers(): Promise<void> {
 
         const data = await response.json();
         servers = data.servers;
+        serverPings.clear();
 
         renderServers();
 
@@ -64,13 +73,8 @@ async function loadServers(): Promise<void> {
         const loadingEl = document.getElementById('loading-message');
         if (loadingEl) {
             loadingEl.innerHTML =
-                `<span style="color: #fca5a5;">Failed to load realms. <a href="#" onclick="location.reload()">Retry</a> or <a href="#" id="skip-link-error">skip</a>.</span>`;
+                `<span style="color: #fca5a5;">Failed to load realms. Please try refreshing.</span>`;
         }
-
-        document.getElementById('skip-link-error')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            continueToGame(null);
-        });
     }
 }
 
@@ -150,9 +154,8 @@ document.getElementById('continue-button')?.addEventListener('click', () => {
     continueToGame(selectedServerId);
 });
 
-document.getElementById('skip-link')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    continueToGame(null);
+document.getElementById('refresh-button')?.addEventListener('click', () => {
+    loadServers();
 });
 
 loadServers();

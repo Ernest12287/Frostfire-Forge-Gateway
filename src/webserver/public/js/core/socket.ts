@@ -432,10 +432,10 @@ async function handleLoadPlayersPacket(data: any) {
           (p) => p.id === movement.id
         );
         if (player && movement._data) {
-          player.position.x = movement._data.x;
-          player.position.y = movement._data.y;
+          player.position.x = Math.round(movement._data.x);
+          player.position.y = Math.round(movement._data.y);
           if (movement.id === cachedPlayerId) {
-            positionText.innerText = `Position: ${movement._data.x}, ${movement._data.y}`;
+            positionText.innerText = `Position: ${player.position.x}, ${player.position.y}`;
           }
         }
       }
@@ -1154,11 +1154,14 @@ socket.onmessage = async (event) => {
       const moveData = data.d || data._data;
       const playerId = data.i || data.id;
 
-      player.position.x = moveData.x;
-      player.position.y = moveData.y;
-
+      player.serverPosition.x = Math.round(moveData.x);
+      player.serverPosition.y = Math.round(moveData.y);
+      player.position.x = Math.round(moveData.x);
+      player.position.y = Math.round(moveData.y);
+      player.lastServerUpdate = performance.now();
+      
       if (playerId === cachedPlayerId) {
-        positionText.innerText = `Position: ${moveData.x}, ${moveData.y}`;
+        positionText.innerText = `Position: ${player.serverPosition.x}, ${player.serverPosition.y}`;
       }
       break;
     }
@@ -1190,11 +1193,20 @@ socket.onmessage = async (event) => {
         }
 
         player.typing = false;
-        player.position.x = moveData.x;
-        player.position.y = moveData.y;
+        player.serverPosition.x = Math.round(moveData.x);
+        player.serverPosition.y = Math.round(moveData.y);
+        player.lastServerUpdate = performance.now();
+        
+        if (playerId !== cachedPlayerId) {
+          player.position.x = Math.round(moveData.x);
+          player.position.y = Math.round(moveData.y);
+        } else {
+          player.position.x = Math.round(moveData.x);
+          player.position.y = Math.round(moveData.y);
+        }
 
         if (playerId === cachedPlayerId) {
-          positionText.innerText = `Position: ${moveData.x}, ${moveData.y}`;
+          positionText.innerText = `Position: ${player.serverPosition.x}, ${player.serverPosition.y}`;
         }
       }
       break;
