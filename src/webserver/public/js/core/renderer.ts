@@ -405,7 +405,7 @@ function renderMap(layer: 'lower' | 'upper' = 'lower', playerTileX?: number, pla
                 {lx: c.lx, ly: c.ly + 1}
               ];
 
-              for (let n of nbrs) {
+              for (const n of nbrs) {
                 let nx = n.lx, ny = n.ly, ncx = c.cx, ncy = c.cy;
 
                 if (nx < 0) { ncx--; nx = window.mapData.chunkSize - 1; }
