@@ -311,7 +311,7 @@ function drawAllLayersWithOpacity(layer: 'lower' | 'upper', visibleChunks: any[]
   }
 }
 
-function renderMap(layer: 'lower' | 'upper' = 'lower') {
+function renderMap(layer: 'lower' | 'upper' = 'lower', playerTileX?: number, playerTileY?: number) {
   if (!ctx || !window.mapData) return;
 
   const viewportWidth = window.innerWidth;
@@ -329,24 +329,148 @@ function renderMap(layer: 'lower' | 'upper' = 'lower') {
   if (isEditorActive && selectedLayer) {
     drawAllLayersWithOpacity(layer, visibleChunks, offsetX, offsetY, selectedLayer);
   } else {
+    const PLAYER_Z_INDEX = 3;
 
     for (const chunk of visibleChunks) {
-      const chunkCanvas = layer === 'lower'
-        ? window.mapData.getChunkLowerCanvas(chunk.x, chunk.y)
-        : window.mapData.getChunkUpperCanvas(chunk.x, chunk.y);
-      if (!chunkCanvas) continue;
+      const chunkKey = `${chunk.x}-${chunk.y}`;
+      const chunkData = window.mapData.loadedChunks.get(chunkKey);
+      if (!chunkData) continue;
 
-      const chunkPixelSize = window.mapData.chunkSize * window.mapData.tilewidth;
-      const chunkWorldX = chunk.x * chunkPixelSize;
-      const chunkWorldY = chunk.y * chunkPixelSize;
+      if (layer === 'lower') {
+        const chunkCanvas = window.mapData.getChunkLowerCanvas(chunk.x, chunk.y);
+        if (!chunkCanvas) continue;
 
-      const screenX = chunkWorldX + offsetX;
-      const screenY = chunkWorldY + offsetY;
+        const chunkPixelSize = window.mapData.chunkSize * window.mapData.tilewidth;
+        const chunkWorldX = chunk.x * chunkPixelSize;
+        const chunkWorldY = chunk.y * chunkPixelSize;
 
-      try {
-        ctx.drawImage(chunkCanvas, screenX, screenY);
-      } catch (error) {
-        console.error("Error drawing chunk canvas:", error);
+        const screenX = chunkWorldX + offsetX;
+        const screenY = chunkWorldY + offsetY;
+
+        try {
+          ctx.drawImage(chunkCanvas, screenX, screenY);
+        } catch (error) {
+          console.error("Error drawing chunk canvas:", error);
+        }
+      } else {
+        const chunkPixelSize = window.mapData.chunkSize * window.mapData.tilewidth;
+        const chunkWorldX = chunk.x * chunkPixelSize;
+        const chunkWorldY = chunk.y * chunkPixelSize;
+
+        const screenX = chunkWorldX + offsetX;
+        const screenY = chunkWorldY + offsetY;
+
+        const sortedLayers = [...chunkData.layers].sort((a: any, b: any) => a.zIndex - b.zIndex);
+
+        for (const chunkLayer of sortedLayers) {
+          if (chunkLayer.zIndex < PLAYER_Z_INDEX) continue;
+
+          const layerNameLower = chunkLayer.name?.toLowerCase() || '';
+          if (layerNameLower.includes('collision') || layerNameLower.includes('nopvp') || layerNameLower.includes('no-pvp')) {
+            continue;
+          }
+
+          const connected = new Set<string>();
+          
+          if (playerTileX !== undefined && playerTileY !== undefined) {
+            const visited = new Set<string>();
+            const queue: Array<{cx: number, cy: number, lx: number, ly: number}> = [];
+            
+            const scx = Math.floor(playerTileX / window.mapData.chunkSize);
+            const scy = Math.floor(playerTileY / window.mapData.chunkSize);
+            const sx = playerTileX - scx * window.mapData.chunkSize;
+            const sy = playerTileY - scy * window.mapData.chunkSize;
+            
+            visited.add(`${scx}-${scy}-${sx}-${sy}`);
+            queue.push({cx: scx, cy: scy, lx: sx, ly: sy});
+
+            while (queue.length > 0) {
+              const c = queue.shift()!;
+              const ck = `${c.cx}-${c.cy}`;
+              const cd = window.mapData.loadedChunks.get(ck);
+              if (!cd) continue;
+
+              const cl = cd.layers.find((l: any) => l.name === chunkLayer.name);
+              if (!cl) continue;
+
+              const tileIdx = cl.data[c.ly * cd.width + c.lx];
+              if (tileIdx === 0) continue;
+
+              connected.add(`${c.cx}-${c.cy}-${c.lx}-${c.ly}`);
+
+              const nbrs = [
+                {lx: c.lx - 1, ly: c.ly},
+                {lx: c.lx + 1, ly: c.ly},
+                {lx: c.lx, ly: c.ly - 1},
+                {lx: c.lx, ly: c.ly + 1}
+              ];
+
+              for (let n of nbrs) {
+                let nx = n.lx, ny = n.ly, ncx = c.cx, ncy = c.cy;
+
+                if (nx < 0) { ncx--; nx = window.mapData.chunkSize - 1; }
+                else if (nx >= window.mapData.chunkSize) { ncx++; nx = 0; }
+
+                if (ny < 0) { ncy--; ny = window.mapData.chunkSize - 1; }
+                else if (ny >= window.mapData.chunkSize) { ncy++; ny = 0; }
+
+                if (ncx < 0 || ncy < 0 || ncx >= window.mapData.chunksX || ncy >= window.mapData.chunksY) continue;
+
+                const nk = `${ncx}-${ncy}-${nx}-${ny}`;
+                if (visited.has(nk)) continue;
+
+                visited.add(nk);
+                queue.push({cx: ncx, cy: ncy, lx: nx, ly: ny});
+              }
+            }
+          }
+
+          const time = performance.now() / 1000;
+          const fadeProgress = Math.min(time / 0.5, 1);
+          const fadeAlpha = 1 - fadeProgress * 0.40;
+
+          for (let y = 0; y < chunkData.height; y++) {
+            for (let x = 0; x < chunkData.width; x++) {
+              const tileIndex = chunkLayer.data[y * chunkData.width + x];
+              if (tileIndex === 0) continue;
+
+              if (connected.has(`${chunk.x}-${chunk.y}-${x}-${y}`)) {
+                ctx.globalAlpha = fadeAlpha;
+              } else {
+                ctx.globalAlpha = 1;
+              }
+
+              const tileset = window.mapData.tilesets.find(
+                (t: any) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
+              );
+              if (!tileset) continue;
+
+              const image = window.mapData.images[window.mapData.tilesets.indexOf(tileset)];
+              if (!image || !image.complete) continue;
+
+              const localTileIndex = tileIndex - tileset.firstgid;
+              const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
+              const srcX = (localTileIndex % tilesPerRow) * tileset.tilewidth;
+              const srcY = Math.floor(localTileIndex / tilesPerRow) * tileset.tileheight;
+
+              const drawX = screenX + x * window.mapData.tilewidth;
+              const drawY = screenY + y * window.mapData.tileheight;
+
+              try {
+                ctx.drawImage(
+                  image,
+                  srcX, srcY,
+                  tileset.tilewidth, tileset.tileheight,
+                  drawX, drawY,
+                  window.mapData.tilewidth, window.mapData.tileheight
+                );
+              } catch (error) {
+                console.error("Error drawing tile:", error);
+              }
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
       }
     }
   }
@@ -456,7 +580,6 @@ function animationLoop() {
     y >= viewportTop - padding &&
     x <= viewportRight + padding &&
     y <= viewportBottom + padding;
-
 
   const visiblePlayers = playersArray.filter(p => {
     const inView = isInView(p.position.x, p.position.y);
@@ -610,7 +733,13 @@ function animationLoop() {
   ctx.restore();
 
   if (!wireframeDebugCheckbox.checked) {
-    renderMap('upper');
+    let playerTileX: number | undefined;
+    let playerTileY: number | undefined;
+    if (currentPlayer && window.mapData) {
+      playerTileX = Math.floor(currentPlayer.position.x / window.mapData.tilewidth);
+      playerTileY = Math.floor(currentPlayer.position.y / window.mapData.tileheight);
+    }
+    renderMap('upper', playerTileX, playerTileY);
   } else {
 
     ctx.save();
