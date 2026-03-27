@@ -1554,7 +1554,7 @@ socket.onmessage = async (event) => {
       cache.equipment = data;
 
       const statSheetOpen = statUI.style.left === "10px";
-      const showingCurrentPlayer = statUI.getAttribute("data-id") === cachedPlayerId;
+      const showingCurrentPlayer = statUI.getAttribute("data-id") === String(cachedPlayerId);
 
       if (statSheetOpen && !showingCurrentPlayer) {
         break;
@@ -1929,7 +1929,7 @@ socket.onmessage = async (event) => {
       player.max_health = data.total_max_health;
       player.max_stamina = data.total_max_stamina;
 
-      if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === data.id) {
+      if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === String(data.id)) {
         levelLabel!.innerText = `Level: ${data.level}`;
         healthLabel!.innerText = `Health: ${data.health} / ${data.total_max_health}`;
         manaLabel!.innerText = `Mana: ${data.stamina} / ${data.total_max_stamina}`;
@@ -2116,7 +2116,7 @@ socket.onmessage = async (event) => {
         t.max_health = stats.total_max_health;
         t.max_stamina = stats.total_max_stamina;
 
-        if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === target) {
+        if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === String(target)) {
           levelLabel!.innerText = `Level: ${stats.level}`;
           healthLabel!.innerText = `Health: ${stats.health} / ${stats.total_max_health}`;
           manaLabel!.innerText = `Mana: ${stats.stamina} / ${stats.total_max_stamina}`;
@@ -2206,7 +2206,7 @@ socket.onmessage = async (event) => {
       critDamageLabel!.innerText = `Critical Damage: ${data.stats.stat_critical_damage || 0}%`;
       avoidanceLabel!.innerText = `Avoidance: ${data.stats.stat_avoidance || 0}%`;
 
-      if (data.id !== cachedPlayerId && data.equipment) {
+      if (String(data.id) !== String(cachedPlayerId) && data.equipment) {
 
         const allSlots = [
           ...equipmentLeftColumn.querySelectorAll(".slot"),
@@ -2273,9 +2273,9 @@ socket.onmessage = async (event) => {
             setupItemTooltip(slotElement, () => itemDetails);
           }
         }
-      } else if (data.id === cachedPlayerId) {
+      } else if (String(data.id) === String(cachedPlayerId)) {
 
-        if (previousShownId && previousShownId !== cachedPlayerId) {
+        if (previousShownId && previousShownId !== String(cachedPlayerId)) {
 
           if (cache.equipment) {
 
@@ -2427,7 +2427,7 @@ socket.onmessage = async (event) => {
       statUI.setAttribute("data-id", data.id);
 
       statUI.style.transition = "1s";
-      statUI.style.left = "10";
+      statUI.style.left = "10px";
       break;
     }
     case "NOTIFY": {

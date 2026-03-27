@@ -255,7 +255,7 @@ function handleStatsUI() {
   if (statUI.style.left === "10px") {
 
     statUI.style.transition = "1s";
-    statUI.style.left = "-600";
+    statUI.style.left = "-600px";
   } else {
 
     sendRequest({ type: "INSPECTPLAYER", data: null });
