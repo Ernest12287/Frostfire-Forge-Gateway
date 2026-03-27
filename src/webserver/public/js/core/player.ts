@@ -22,17 +22,17 @@ async function createPlayer(data: any) {
 
   if (data.spriteData && (data.spriteData.bodySprite || data.spriteData.headSprite)) {
     layeredAnimationPromise = initializeLayeredAnimation(
-      null,
+      data.spriteData.mountSprite || null,
       data.spriteData.bodySprite || null,
       data.spriteData.headSprite || null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
+      data.spriteData.armorHelmetSprite || null,
+      data.spriteData.armorShoulderguardsSprite || null,
+      data.spriteData.armorNeckSprite || null,
+      data.spriteData.armorHandsSprite || null,
+      data.spriteData.armorChestSprite || null,
+      data.spriteData.armorFeetSprite || null,
+      data.spriteData.armorLegsSprite || null,
+      data.spriteData.armorWeaponSprite || null,
       data.spriteData.animationState || 'idle'
     );
   } else if (data.bodySprite && data.headSprite) {
