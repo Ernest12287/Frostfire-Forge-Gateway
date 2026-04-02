@@ -123,6 +123,20 @@ chatInput.addEventListener("input", () => {
 });
 
 window.addEventListener("keydown", async (e) => {
+  // Handle Ctrl+S globally to prevent player movement and spam
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Only trigger save if tile editor is active
+    const tileEditor = (window as any).tileEditor;
+    if (tileEditor?.isActive) {
+      // Delegate to tile editor's save method which properly handles all data
+      tileEditor.saveMap();
+    }
+    return;
+  }
+
   if (e.key === 'ContextMenu' || e.code === 'ContextMenu') {
     setContextMenuKeyTriggered(true);
   }
@@ -240,7 +254,12 @@ function updateOrientationClass() {
 window.addEventListener("resize", () => {
 
   const actualHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  document.documentElement.style.setProperty('--viewport-height', `${actualHeight}px`);
+
+  // Don't update viewport height if tile editor is active (it would break NPC dialog positioning)
+  const tileEditor = (window as any).tileEditor;
+  if (!tileEditor?.isActive) {
+    document.documentElement.style.setProperty('--viewport-height', `${actualHeight}px`);
+  }
 
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;

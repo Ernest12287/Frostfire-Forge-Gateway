@@ -111,6 +111,9 @@ export default async function loadMap(metadata: any): Promise<boolean> {
     const chunksX = Math.ceil(mapWidth / CHUNK_SIZE);
     const chunksY = Math.ceil(mapHeight / CHUNK_SIZE);
 
+    // Extract object layers from metadata
+    const objectLayers = metadata?.objectLayers || [];
+
     window.mapData = {
       name: mapName,
       width: mapWidth,
@@ -125,6 +128,9 @@ export default async function loadMap(metadata: any): Promise<boolean> {
       loadedChunks: new Map<string, ChunkData>(),
       spawnX: spawnX,
       spawnY: spawnY,
+      warps: metadata?.warps || null,
+      graveyards: metadata?.graveyards || null,
+      objectLayers: objectLayers,
       requestChunk: async (chunkX: number, chunkY: number) => {
         return await requestChunk(chunkX, chunkY);
       },

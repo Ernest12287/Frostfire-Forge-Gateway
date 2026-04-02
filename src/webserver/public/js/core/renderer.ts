@@ -298,17 +298,18 @@ function drawAllLayersWithOpacity(layer: 'lower' | 'upper', visibleChunks: any[]
 
       const tileEditor = (window as any).tileEditor;
       const useDimming = tileEditor?.isActive && tileEditor.dimOtherLayers;
+      const isLayerVisible = tileEditor?.isLayerVisible(chunkLayer.name) ?? true;
 
       if (isCollisionSelected || isNoPvpSelected) {
 
         if (isCollisionLayer || isNoPvpLayer) {
           continue;
         }
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha = isLayerVisible ? 1.0 : 0;
       } else if (useDimming) {
-        ctx.globalAlpha = isSelected ? 1.0 : 0.5;
+        ctx.globalAlpha = isSelected ? (isLayerVisible ? 1.0 : 0) : (isLayerVisible ? 0.5 : 0);
       } else {
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha = isLayerVisible ? 1.0 : 0;
       }
 
       for (let y = 0; y < chunkData.height; y++) {
@@ -348,6 +349,276 @@ function drawAllLayersWithOpacity(layer: 'lower' | 'upper', visibleChunks: any[]
     }
 
     ctx.globalAlpha = 1;
+  }
+}
+
+function renderGraveyardsAndWarps(renderCtx: CanvasRenderingContext2D, offsetX: number, offsetY: number) {
+  if (!window.mapData) return;
+
+  const tilesize = 32;
+  const tileEditor = (window as any).tileEditor;
+
+  // Render graveyards as tombstones
+  if (window.mapData.graveyards) {
+    // Check if Graveyards are visible in the Objects panel
+    const graveyardsVisible = !tileEditor || tileEditor.isObjectLayerVisible('Graveyards');
+
+    Object.entries(window.mapData.graveyards).forEach(([name, data]: [string, any]) => {
+      const x = data.position?.x || 0;
+      const y = data.position?.y || 0;
+      const isSelected = tileEditor && tileEditor.getSelectedObjectName?.() === name;
+
+      // Draw selection highlight first (behind everything)
+      if (isSelected) {
+        renderCtx.fillStyle = 'rgba(100, 200, 255, 0.3)';
+        renderCtx.beginPath();
+        renderCtx.arc(x, y, 25, 0, Math.PI * 2);
+        renderCtx.fill();
+      }
+
+      // Apply opacity based on visibility toggle
+      const opacity = graveyardsVisible ? 1.0 : 0;
+
+      const width = 16;
+      const height = 22;
+      const cornerRadius = 2;
+
+      // Set opacity based on layer visibility
+      const prevAlpha = renderCtx.globalAlpha;
+      renderCtx.globalAlpha = opacity;
+
+      // Draw tombstone shadow
+      renderCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      renderCtx.fillRect(x - width / 2 + 1, y - height / 2 + 1, width, height);
+
+      // Draw main tombstone body (dark gray or highlighted)
+      renderCtx.fillStyle = isSelected ? 'rgba(100, 100, 150, 0.9)' : 'rgba(60, 60, 70, 0.9)';
+      renderCtx.strokeStyle = isSelected ? 'rgba(150, 150, 200, 1)' : 'rgba(80, 80, 90, 1)';
+      renderCtx.lineWidth = isSelected ? 2.5 : 1.5;
+
+      // Rounded rectangle for tombstone
+      renderCtx.beginPath();
+      renderCtx.moveTo(x - width / 2 + cornerRadius, y - height / 2);
+      renderCtx.lineTo(x + width / 2 - cornerRadius, y - height / 2);
+      renderCtx.quadraticCurveTo(x + width / 2, y - height / 2, x + width / 2, y - height / 2 + cornerRadius);
+      renderCtx.lineTo(x + width / 2, y + height / 2 - 2);
+      renderCtx.quadraticCurveTo(x + width / 2, y + height / 2, x + width / 2 - cornerRadius, y + height / 2);
+      renderCtx.lineTo(x - width / 2 + cornerRadius, y + height / 2);
+      renderCtx.quadraticCurveTo(x - width / 2, y + height / 2, x - width / 2, y + height / 2 - 2);
+      renderCtx.lineTo(x - width / 2, y - height / 2 + cornerRadius);
+      renderCtx.quadraticCurveTo(x - width / 2, y - height / 2, x - width / 2 + cornerRadius, y - height / 2);
+      renderCtx.fill();
+      renderCtx.stroke();
+
+      // Draw lighter edge/highlight
+      renderCtx.strokeStyle = 'rgba(120, 120, 130, 0.6)';
+      renderCtx.lineWidth = 1;
+      renderCtx.beginPath();
+      renderCtx.moveTo(x - width / 2 + 2, y - height / 2 + 2);
+      renderCtx.lineTo(x - width / 2 + 2, y + height / 2 - 2);
+      renderCtx.stroke();
+
+      // Draw cross on tombstone (centered)
+      renderCtx.strokeStyle = 'rgba(200, 180, 140, 0.9)';
+      renderCtx.lineWidth = 1.5;
+      renderCtx.lineCap = 'round';
+
+      // Vertical line of cross
+      renderCtx.beginPath();
+      renderCtx.moveTo(x, y - 4);
+      renderCtx.lineTo(x, y + 2);
+      renderCtx.stroke();
+
+      // Horizontal line of cross
+      renderCtx.beginPath();
+      renderCtx.moveTo(x - 2.5, y - 1);
+      renderCtx.lineTo(x + 2.5, y - 1);
+      renderCtx.stroke();
+
+      // Draw name label above tombstone with background
+      renderCtx.save();
+      renderCtx.font = 'bold 13px monospace';
+      renderCtx.textAlign = 'center';
+      renderCtx.textBaseline = 'middle';
+
+      const textMetrics = renderCtx.measureText(name);
+      const textWidth = textMetrics.width;
+      const textHeight = 16;
+      const labelX = x;
+      const labelY = y - height / 2 - 12;
+
+      // Draw background
+      renderCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      renderCtx.fillRect(labelX - textWidth / 2 - 4, labelY - textHeight / 2 - 2, textWidth + 8, textHeight + 4);
+
+      // Draw text
+      renderCtx.fillStyle = 'rgba(150, 220, 255, 1)';
+      renderCtx.fillText(name, labelX, labelY);
+
+      // Store label coordinates for click detection (convert world to screen coords)
+      if (tileEditor) {
+        const screenX = labelX + offsetX;
+        const screenY = labelY + offsetY;
+        tileEditor.setLabelCoords(name, 'Graveyards', screenX - textWidth / 2 - 4, screenY - textHeight / 2 - 2, textWidth + 8, textHeight + 4);
+      }
+
+      // Draw delete button at bottom right when selected
+      if (isSelected) {
+        const buttonSize = 16;
+        const buttonX = x + width / 2 + 8;
+        const buttonY = y + height / 2 + 8;
+
+        renderCtx.fillStyle = 'rgba(255, 100, 100, 0.9)';
+        renderCtx.fillRect(buttonX, buttonY, buttonSize, buttonSize);
+
+        renderCtx.strokeStyle = 'rgba(200, 50, 50, 1)';
+        renderCtx.lineWidth = 1.5;
+        renderCtx.strokeRect(buttonX, buttonY, buttonSize, buttonSize);
+
+        renderCtx.strokeStyle = 'rgba(255, 255, 255, 1)';
+        renderCtx.lineWidth = 1.5;
+        renderCtx.beginPath();
+        renderCtx.moveTo(buttonX + 3, buttonY + 3);
+        renderCtx.lineTo(buttonX + buttonSize - 3, buttonY + buttonSize - 3);
+        renderCtx.moveTo(buttonX + buttonSize - 3, buttonY + 3);
+        renderCtx.lineTo(buttonX + 3, buttonY + buttonSize - 3);
+        renderCtx.stroke();
+
+        // Store button coordinates for click detection
+        if (tileEditor) {
+          tileEditor.setDeleteButtonCoords('Graveyards', name, buttonX, buttonY, buttonSize);
+        }
+      }
+
+      renderCtx.restore();
+      // Restore opacity
+      renderCtx.globalAlpha = prevAlpha;
+    });
+  }
+
+  // Render warps as blue outlines
+  if (window.mapData.warps) {
+    // Check if Warps are visible in the Objects panel
+    const warpsVisible = !tileEditor || tileEditor.isObjectLayerVisible('Warps');
+
+    Object.entries(window.mapData.warps).forEach(([name, data]: [string, any]) => {
+      const x = data.position?.x || 0;
+      const y = data.position?.y || 0;
+      const width = data.size?.width || tilesize;
+      const height = data.size?.height || tilesize;
+      const isSelected = tileEditor && tileEditor.getSelectedObjectName?.() === name;
+
+      // Draw selection highlight first (behind everything)
+      if (isSelected) {
+        renderCtx.fillStyle = 'rgba(100, 200, 255, 0.2)';
+        renderCtx.fillRect(x - 5, y - 5, width + 10, height + 10);
+      }
+
+      // Apply opacity based on visibility toggle
+      const opacity = warpsVisible ? 1.0 : 0;
+
+      // Set opacity for rendering
+      const prevAlpha = renderCtx.globalAlpha;
+      renderCtx.globalAlpha = opacity;
+
+      // Draw blue outline rectangle (position is top-left corner)
+      renderCtx.strokeStyle = isSelected ? 'rgba(150, 220, 255, 1)' : 'rgba(0, 150, 255, 0.8)';
+      renderCtx.lineWidth = isSelected ? 3 : 2;
+      renderCtx.strokeRect(x, y, width, height);
+
+      // Draw corner markers (dark blue)
+      renderCtx.fillStyle = 'rgba(50, 100, 200, 1)';
+      const markerSize = isSelected ? 6 : 4;
+      const corners = [
+        [x, y],
+        [x + width, y],
+        [x, y + height],
+        [x + width, y + height]
+      ];
+      corners.forEach(([cx, cy]) => {
+        renderCtx.fillRect(cx - markerSize / 2, cy - markerSize / 2, markerSize, markerSize);
+      });
+
+      // Draw edge midpoint markers only when selected
+      if (isSelected) {
+        const edgeMarkerSize = 5;
+
+        // Top edge midpoint (green)
+        renderCtx.fillStyle = 'rgba(100, 255, 100, 1)';
+        renderCtx.fillRect(x + width / 2 - edgeMarkerSize / 2, y - edgeMarkerSize / 2, edgeMarkerSize, edgeMarkerSize);
+
+        // Bottom edge midpoint (green)
+        renderCtx.fillStyle = 'rgba(100, 255, 100, 1)';
+        renderCtx.fillRect(x + width / 2 - edgeMarkerSize / 2, y + height - edgeMarkerSize / 2, edgeMarkerSize, edgeMarkerSize);
+
+        // Left edge midpoint (red)
+        renderCtx.fillStyle = 'rgba(255, 100, 100, 1)';
+        renderCtx.fillRect(x - edgeMarkerSize / 2, y + height / 2 - edgeMarkerSize / 2, edgeMarkerSize, edgeMarkerSize);
+
+        // Right edge midpoint (red)
+        renderCtx.fillStyle = 'rgba(255, 100, 100, 1)';
+        renderCtx.fillRect(x + width - edgeMarkerSize / 2, y + height / 2 - edgeMarkerSize / 2, edgeMarkerSize, edgeMarkerSize);
+      }
+
+      // Draw name label above the warp with background
+      renderCtx.save();
+      renderCtx.font = 'bold 13px monospace';
+      renderCtx.textAlign = 'center';
+      renderCtx.textBaseline = 'middle';
+
+      const textMetrics = renderCtx.measureText(name);
+      const textWidth = textMetrics.width;
+      const textHeight = 16;
+      const labelX = x + width / 2;
+      const labelY = y - 12;
+
+      // Draw background
+      renderCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      renderCtx.fillRect(labelX - textWidth / 2 - 4, labelY - textHeight / 2 - 2, textWidth + 8, textHeight + 4);
+
+      // Draw text
+      renderCtx.fillStyle = 'rgba(100, 200, 255, 1)';
+      renderCtx.fillText(name, labelX, labelY);
+
+      // Store label coordinates for click detection (convert world to screen coords)
+      if (tileEditor) {
+        const screenX = labelX + offsetX;
+        const screenY = labelY + offsetY;
+        tileEditor.setLabelCoords(name, 'Warps', screenX - textWidth / 2 - 4, screenY - textHeight / 2 - 2, textWidth + 8, textHeight + 4);
+      }
+
+      // Draw delete button at bottom right when selected
+      if (isSelected) {
+        const buttonSize = 16;
+        const buttonX = x + width + 4;
+        const buttonY = y + height + 4;
+
+        renderCtx.fillStyle = 'rgba(255, 100, 100, 0.9)';
+        renderCtx.fillRect(buttonX, buttonY, buttonSize, buttonSize);
+
+        renderCtx.strokeStyle = 'rgba(200, 50, 50, 1)';
+        renderCtx.lineWidth = 1.5;
+        renderCtx.strokeRect(buttonX, buttonY, buttonSize, buttonSize);
+
+        renderCtx.strokeStyle = 'rgba(255, 255, 255, 1)';
+        renderCtx.lineWidth = 1.5;
+        renderCtx.beginPath();
+        renderCtx.moveTo(buttonX + 3, buttonY + 3);
+        renderCtx.lineTo(buttonX + buttonSize - 3, buttonY + buttonSize - 3);
+        renderCtx.moveTo(buttonX + buttonSize - 3, buttonY + 3);
+        renderCtx.lineTo(buttonX + 3, buttonY + buttonSize - 3);
+        renderCtx.stroke();
+
+        // Store button coordinates for click detection
+        if (tileEditor) {
+          tileEditor.setDeleteButtonCoords('Warps', name, buttonX, buttonY, buttonSize);
+        }
+      }
+
+      renderCtx.restore();
+      // Restore opacity
+      renderCtx.globalAlpha = prevAlpha;
+    });
   }
 }
 
@@ -407,6 +678,12 @@ function renderMap(layer: 'lower' | 'upper' = 'lower', playerTileX?: number, pla
 
           const layerNameLower = chunkLayer.name?.toLowerCase() || '';
           if (layerNameLower.includes('collision') || layerNameLower.includes('nopvp') || layerNameLower.includes('no-pvp')) {
+            continue;
+          }
+
+          const tileEditor = (window as any).tileEditor;
+          const isLayerVisible = tileEditor?.isLayerVisible(chunkLayer.name) ?? true;
+          if (!isLayerVisible) {
             continue;
           }
 
@@ -653,6 +930,14 @@ function animationLoop() {
   ctx.translate(offsetX, offsetY);
 
   ctx.imageSmoothingEnabled = false;
+
+  // Render graveyards and warps when tile editor is active
+  const tileEditor = (window as any).tileEditor;
+  if (tileEditor?.isActive) {
+    ctx.save();
+    renderGraveyardsAndWarps(ctx, offsetX, offsetY);
+    ctx.restore();
+  }
 
   if (wireframeDebugCheckbox.checked) {
 
