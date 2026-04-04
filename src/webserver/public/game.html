@@ -523,6 +523,87 @@
         </div>
       </div>
     </div>
+    <!-- NPC Editor -->
+    <div id="npc-editor-container" class="ui" style="display: none;">
+      <!-- NPC List Panel -->
+      <div id="npc-editor-list-panel" class="ui ne-floating-panel" style="position: fixed; left: 50px; top: 50px; width: 300px; z-index: 1000;">
+        <div class="ne-panel-header ui">
+          <span class="ne-panel-title ui">NPCs</span>
+          <button type="button" class="ne-panel-minimize ui">−</button>
+          <button type="button" class="ne-panel-close ui">×</button>
+        </div>
+        <div class="ne-panel-content ui">
+          <input type="text" id="ne-npc-search" placeholder="Search NPCs..." style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; box-sizing: border-box; font-family: 'Comic Relief', Arial, sans-serif; margin-bottom: 12px;">
+          <div id="npc-list" style="margin-bottom: 12px;"></div>
+          <button type="button" id="ne-new-npc">+ New NPC</button>
+        </div>
+      </div>
+
+      <!-- NPC Properties Panel -->
+      <div id="npc-editor-properties-panel" class="ui ne-floating-panel" style="display: none; position: fixed; left: 400px; top: 50px; width: 380px; z-index: 1000;">
+        <div class="ne-panel-header ui">
+          <span class="ne-panel-title ui">NPC Properties<span id="ne-dirty-indicator" style="display: none; margin-left: 4px;">*</span></span>
+          <button type="button" id="ne-save-npc" class="ne-panel-save ui" title="Save NPC" style="right: 40px;">💾</button>
+          <button type="button" class="ne-panel-minimize ui" style="right: 12px;">−</button>
+        </div>
+        <div class="ne-panel-content ui">
+          <div style="margin-bottom: 12px;">
+            <label>NPC ID</label>
+            <div id="ne-npc-id" style="padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: rgba(255, 255, 255, 0.5);"></div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Position</label>
+            <div id="ne-npc-position" style="padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: rgba(255, 255, 255, 0.5); font-size: 12px;">Click ⊕ to move</div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Direction</label>
+            <select id="ne-npc-direction" style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; font-family: 'Comic Relief', Arial, sans-serif;">
+              <option value="down">Down</option>
+              <option value="up">Up</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>
+              <input type="checkbox" id="ne-npc-hidden"> Hidden
+            </label>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Dialog <span style="color: rgba(255,255,255,0.4); font-size: 11px;">(max 500 chars)</span></label>
+            <textarea id="ne-npc-dialog" maxlength="500" rows="3" spellcheck="false" style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; box-sizing: border-box; font-family: 'Comic Relief', Arial, sans-serif; resize: vertical;"></textarea>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Script <span style="color: rgba(255,255,255,0.4); font-size: 11px;">(max 5000 chars)</span></label>
+            <textarea id="ne-npc-script" maxlength="5000" rows="5" spellcheck="false" style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; box-sizing: border-box; font-family: 'Comic Relief', Arial, sans-serif; resize: vertical;"></textarea>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Quest ID</label>
+            <input type="number" id="ne-npc-quest" min="0" step="1">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Particles</label>
+            <input type="text" id="ne-particle-search" placeholder="Search particles..." style="width: 100%; padding: 6px 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; box-sizing: border-box; font-family: 'Comic Relief', Arial, sans-serif; margin-bottom: 6px;">
+            <div id="ne-particle-options" style="max-height: 150px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 4px;"></div>
+          </div>
+          <button type="button" id="ne-delete-npc" style="width: 100%; margin-top: 4px; padding: 8px; background: rgba(255, 70, 70, 0.15); border: 1px solid rgba(255, 70, 70, 0.3); color: #ff6666; border-radius: 6px; cursor: pointer; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Delete NPC</button>
+        </div>
+      </div>
+
+      <!-- Delete NPC Modal -->
+      <div id="ne-delete-npc-modal" class="ui ne-modal">
+        <div class="ne-modal-content" style="background: rgba(30, 30, 40, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 70, 70, 0.3); border-radius: 10px; padding: 30px; width: 350px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);">
+          <div style="margin-bottom: 20px;">
+            <h2 style="color: #FFF1DA; font-size: 1.2em; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 0.5px;">Delete NPC</h2>
+            <p style="color: rgba(255, 255, 255, 0.8); margin: 0; font-size: 13px;">Are you sure you want to delete <span id="ne-delete-npc-id" style="color: #ff6666; font-weight: 600;"></span>?</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="ne-delete-confirm" style="flex: 1; padding: 10px; background: rgba(255, 70, 70, 0.2); border: 1px solid rgba(255, 70, 70, 0.4); color: #ff6666; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Delete</button>
+            <button type="button" id="ne-delete-cancel" style="flex: 1; padding: 10px; background: rgba(46, 204, 113, 0.2); border: 1px solid rgba(46, 204, 113, 0.4); color: #46cc71; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Item Tooltip -->
     <div id="item-tooltip" class="ui" style="display: none;">
       <div id="tooltip-name" class="ui"></div>

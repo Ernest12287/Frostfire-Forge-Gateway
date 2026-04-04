@@ -983,6 +983,7 @@ function animationLoop() {
 
     for (const p of visiblePlayers) p.show(ctx, currentPlayer);
 
+    const npcEditor = (window as any).npcEditor;
     for (const npc of visibleNpcs) {
       npc.show(ctx);
       if (npc.particles) {
@@ -993,6 +994,17 @@ function animationLoop() {
         }
       }
       npc.dialogue(ctx);
+      // Draw outline for hidden NPCs when NPC editor is active
+      if (npcEditor?.isActive && npc.hidden) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+        ctx.fillStyle = 'rgba(255, 80, 80, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.fillRect(npc.position.x, npc.position.y, 32, 48);
+        ctx.strokeRect(npc.position.x, npc.position.y, 32, 48);
+        ctx.restore();
+      }
     }
 
     const now = performance.now();

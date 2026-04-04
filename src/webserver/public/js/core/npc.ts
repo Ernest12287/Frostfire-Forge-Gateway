@@ -8,6 +8,7 @@ function createNPC(data: any) {
   const npc: NPC = {
     id: data.id,
     dialog: data.dialog || "",
+    hidden: data?.hidden ?? false,
     position: {
       x: data.location.x,
       y: data.location.y,
@@ -37,7 +38,7 @@ function createNPC(data: any) {
 
       context.globalAlpha = 1;
 
-      if (!data?.hidden) {
+      if (!this.hidden) {
         context.drawImage(npcImage, this.position.x, this.position.y, npcImage.width, npcImage.height);
       }
     },

@@ -630,6 +630,98 @@ socket.onmessage = async (event) => {
       });
       break;
     }
+    case "TOGGLE_NPC_EDITOR": {
+
+      import('./npceditor.js').then((module) => {
+        module.default.toggle();
+      });
+      break;
+    }
+    case "NPC_LIST": {
+
+      if ((window as any).npcEditor && (window as any).npcEditor.setNpcs) {
+        (window as any).npcEditor.setNpcs(data.data ?? data);
+      } else {
+        import('./npceditor.js').then((module) => {
+          if (module.default && module.default.setNpcs) {
+            module.default.setNpcs(data.data ?? data);
+          }
+        });
+      }
+      break;
+    }
+    case "NPC_UPDATED": {
+
+      const updatedNpc = data.data ?? data;
+      // Update live game world NPC
+      const cachedNpcs = cache.npcs || [];
+      const existingIdx = cachedNpcs.findIndex((n: any) => n.id === updatedNpc.id);
+      if (existingIdx >= 0) {
+        // Update position and properties on the existing live NPC object
+        const liveNpc = cachedNpcs[existingIdx];
+        if (updatedNpc.position) {
+          liveNpc.position = {
+            x: updatedNpc.position.x,
+            y: updatedNpc.position.y,
+          };
+        }
+        if (updatedNpc.dialog !== undefined) liveNpc.dialog = updatedNpc.dialog || "";
+        if (updatedNpc.hidden !== undefined) liveNpc.hidden = updatedNpc.hidden;
+        if (updatedNpc.particles !== undefined) liveNpc.particles = updatedNpc.particles || [];
+        if (updatedNpc.quest !== undefined) liveNpc.quest = updatedNpc.quest || null;
+        // Reset particle arrays so they re-emit with updated config
+        liveNpc.particleArrays = {};
+        liveNpc.lastEmitTime = {};
+        // Re-run script if it changed
+        if (updatedNpc.script !== undefined) {
+          liveNpc.script = updatedNpc.script;
+          try {
+            if (updatedNpc.script) {
+              new Function(
+                "with(this) { " + decodeURIComponent(updatedNpc.script) + " }"
+              ).call(liveNpc);
+            }
+          } catch (e) {
+            console.error("Error re-running NPC script:", e);
+          }
+        }
+      } else {
+        // New NPC — spawn it in the game world
+        createNPC({
+          id: updatedNpc.id,
+          location: { x: updatedNpc.position?.x ?? 0, y: updatedNpc.position?.y ?? 0, direction: updatedNpc.position?.direction || "down" },
+          dialog: updatedNpc.dialog || "",
+          hidden: updatedNpc.hidden ?? false,
+          particles: updatedNpc.particles || [],
+          quest: updatedNpc.quest || null,
+          script: updatedNpc.script || "",
+          map: updatedNpc.map,
+          position: updatedNpc.position,
+          last_updated: updatedNpc.last_updated,
+        });
+      }
+      // Notify editor
+      if ((window as any).npcEditor && (window as any).npcEditor.handleNpcUpdated) {
+        (window as any).npcEditor.handleNpcUpdated(updatedNpc);
+      }
+      break;
+    }
+    case "NPC_REMOVED": {
+
+      const removedId = (data.data ?? data)?.id;
+      if (removedId != null) {
+        // Remove from live game world
+        const idx = cache.npcs ? cache.npcs.findIndex((n: any) => n.id === removedId) : -1;
+        if (idx >= 0) {
+          cache.npcs.splice(idx, 1);
+        }
+        // Notify editor
+        if ((window as any).npcEditor && (window as any).npcEditor.handleNpcRemoved) {
+          (window as any).npcEditor.handleNpcRemoved(removedId);
+        }
+      }
+      break;
+    }
     case "PARTICLE_LIST": {
 
       // Try to access globally set instance first
@@ -642,6 +734,11 @@ socket.onmessage = async (event) => {
             module.default.addParticleListItem(data);
           }
         });
+      }
+      // Also feed particle names to NPC editor if open
+      const particleListData = Array.isArray(data) ? data : (data.data ?? []);
+      if ((window as any).npcEditor && (window as any).npcEditor.setParticleOptions) {
+        (window as any).npcEditor.setParticleOptions(particleListData);
       }
       break;
     }
