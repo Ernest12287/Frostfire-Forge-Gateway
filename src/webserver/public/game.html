@@ -372,6 +372,157 @@
         </div>
       </div>
     </div>
+    <!-- Particle Editor -->
+    <div id="particle-editor-container" class="ui" style="display: none;">
+      <!-- Properties Panel -->
+      <div id="particle-editor-properties-panel" class="ui pe-floating-panel" style="display: none; position: fixed; left: 50px; top: 50px; width: 350px; z-index: 1000;">
+        <div class="pe-panel-header ui">
+          <button type="button" id="pe-reset-particle" class="pe-panel-reset ui" title="Reset to Defaults">↻</button>
+          <span class="pe-panel-title ui">Particle Properties<span id="pe-dirty-indicator" style="display: none; margin-left: 4px;">*</span></span>
+          <button type="button" id="pe-save-particle" class="pe-panel-save ui" title="Save Particle">💾</button>
+          <button type="button" class="pe-panel-minimize ui">−</button>
+        </div>
+        <div class="pe-panel-content ui">
+          <div style="margin-bottom: 12px;">
+            <label>Particle Name</label>
+            <div id="pe-particle-name" style="padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: rgba(255, 255, 255, 0.7);"></div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Size</label>
+            <input type="number" id="pe-particle-size" min="1" step="1">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Color</label>
+            <input type="color" id="pe-particle-color">
+          </div>
+          <div class="pe-xy-pair">
+            <div style="flex: 1; margin-right: 6px;">
+              <label>Velocity X</label>
+              <input type="number" id="pe-particle-velocity-x" step="0.1">
+            </div>
+            <div style="flex: 1;">
+              <label>Velocity Y</label>
+              <input type="number" id="pe-particle-velocity-y" step="0.1">
+            </div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Lifetime (ms)</label>
+            <input type="number" id="pe-particle-lifetime" min="1" step="1">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Opacity (0-1)</label>
+            <input type="number" id="pe-particle-opacity" min="0" max="1" step="0.1">
+          </div>
+          <div class="pe-xy-pair">
+            <div style="flex: 1; margin-right: 6px;">
+              <label>Gravity X</label>
+              <input type="number" id="pe-particle-gravity-x" step="0.1">
+            </div>
+            <div style="flex: 1;">
+              <label>Gravity Y</label>
+              <input type="number" id="pe-particle-gravity-y" step="0.1">
+            </div>
+          </div>
+          <div class="pe-xy-pair">
+            <div style="flex: 1; margin-right: 6px;">
+              <label>Local Position X</label>
+              <input type="number" id="pe-particle-localpos-x" step="0.1">
+            </div>
+            <div style="flex: 1;">
+              <label>Local Position Y</label>
+              <input type="number" id="pe-particle-localpos-y" step="0.1">
+            </div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Interval (ms)</label>
+            <input type="number" id="pe-particle-interval" min="1" step="1">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Max Amount</label>
+            <input type="number" id="pe-particle-amount" min="1" step="1">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>Stagger Time</label>
+            <input type="number" id="pe-particle-staggertime" min="0" step="0.1">
+          </div>
+          <div class="pe-xy-pair">
+            <div style="flex: 1; margin-right: 6px;">
+              <label>Spread X</label>
+              <input type="number" id="pe-particle-spread-x" step="0.1">
+            </div>
+            <div style="flex: 1;">
+              <label>Spread Y</label>
+              <input type="number" id="pe-particle-spread-y" step="0.1">
+            </div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>
+              <input type="checkbox" id="pe-particle-visible" value="1"> Visible
+            </label>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label>
+              <input type="checkbox" id="pe-particle-weather" value="1"> Affected by Weather
+            </label>
+          </div>
+          <button type="button" id="pe-delete-particle">Delete Particle</button>
+        </div>
+      </div>
+
+      <!-- Particle List Panel -->
+      <div id="particle-editor-list-panel" class="ui pe-floating-panel" style="position: fixed; left: 500px; top: 50px; width: 300px; z-index: 1000;">
+        <div class="pe-panel-header ui">
+          <span class="pe-panel-title ui">Particles</span>
+          <button type="button" class="pe-panel-minimize ui">−</button>
+          <button type="button" class="pe-panel-close ui">×</button>
+        </div>
+        <div class="pe-panel-content ui">
+          <input type="text" id="pe-particle-search" placeholder="Search particles..." style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; box-sizing: border-box; font-family: 'Comic Relief', Arial, sans-serif; margin-bottom: 12px;">
+          <div id="particle-list" style="margin-bottom: 12px;"></div>
+          <button type="button" id="pe-new-particle">+ New Particle</button>
+        </div>
+      </div>
+
+      <!-- Preview Panel -->
+      <div id="particle-editor-preview-panel" class="ui pe-floating-panel" style="display: none; position: fixed; left: 900px; top: 50px; width: 450px; z-index: 1000;">
+        <div class="pe-panel-header ui">
+          <span class="pe-panel-title ui">Preview</span>
+          <button type="button" class="pe-panel-close ui">×</button>
+        </div>
+        <div class="pe-panel-content ui">
+          <canvas id="particle-preview-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- New Particle Modal -->
+      <div id="pe-new-particle-modal" class="ui pe-modal">
+        <div class="pe-modal-content" style="background: rgba(30, 30, 40, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(46, 204, 113, 0.3); border-radius: 10px; padding: 30px; width: 350px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);">
+          <div style="margin-bottom: 20px;">
+            <h2 style="color: #FFF1DA; font-size: 1.2em; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 0.5px;">Create New Particle</h2>
+            <label style="display: block; margin-bottom: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.7); text-transform: uppercase; letter-spacing: 0.5px;">Particle Name</label>
+            <input type="text" id="pe-new-particle-name-input" placeholder="Enter particle name" style="width: 100%; padding: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: white; box-sizing: border-box; font-family: 'Comic Relief', Arial, sans-serif;">
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="pe-modal-confirm" style="flex: 1; padding: 10px; background: rgba(46, 204, 113, 0.2); border: 1px solid rgba(46, 204, 113, 0.4); color: #46cc71; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Create</button>
+            <button type="button" id="pe-modal-cancel" style="flex: 1; padding: 10px; background: rgba(255, 70, 70, 0.2); border: 1px solid rgba(255, 70, 70, 0.4); color: #ff6666; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete Particle Modal -->
+      <div id="pe-delete-particle-modal" class="ui pe-modal">
+        <div class="pe-modal-content" style="background: rgba(30, 30, 40, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 70, 70, 0.3); border-radius: 10px; padding: 30px; width: 350px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);">
+          <div style="margin-bottom: 20px;">
+            <h2 style="color: #FFF1DA; font-size: 1.2em; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 0.5px;">Delete Particle</h2>
+            <p style="color: rgba(255, 255, 255, 0.8); margin: 0; font-size: 13px;">Are you sure you want to delete <span id="pe-delete-particle-name" style="color: #ff6666; font-weight: 600;"></span>?</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="pe-delete-confirm" style="flex: 1; padding: 10px; background: rgba(255, 70, 70, 0.2); border: 1px solid rgba(255, 70, 70, 0.4); color: #ff6666; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Delete</button>
+            <button type="button" id="pe-delete-cancel" style="flex: 1; padding: 10px; background: rgba(46, 204, 113, 0.2); border: 1px solid rgba(46, 204, 113, 0.4); color: #46cc71; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: 'Comic Relief', Arial, sans-serif; transition: all 0.2s;">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Item Tooltip -->
     <div id="item-tooltip" class="ui" style="display: none;">
       <div id="tooltip-name" class="ui"></div>

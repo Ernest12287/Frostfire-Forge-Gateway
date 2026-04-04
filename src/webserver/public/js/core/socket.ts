@@ -70,6 +70,9 @@ function sendRequest(data: any) {
   socket.send(packet.encode(JSON.stringify(data)));
 }
 
+// Make sendRequest available globally for dynamically imported modules
+(window as any).sendRequest = sendRequest;
+
 const pendingMapChunkRequests = new Map<string, {resolve: (data: any) => void, reject: (error: Error) => void}>();
 const pendingTilesetRequests = new Map<string, {resolve: (data: any) => void, reject: (error: Error) => void}>();
 
@@ -618,6 +621,89 @@ socket.onmessage = async (event) => {
       import('./tileeditor.js').then((module) => {
         module.default.toggle();
       });
+      break;
+    }
+    case "TOGGLE_PARTICLE_EDITOR": {
+
+      import('./particleeditor.js').then((module) => {
+        module.default.toggle();
+      });
+      break;
+    }
+    case "PARTICLE_LIST": {
+
+      // Try to access globally set instance first
+      if ((window as any).particleEditor && (window as any).particleEditor.addParticleListItem) {
+        (window as any).particleEditor.addParticleListItem(data);
+      } else {
+        // Fallback to importing
+        import('./particleeditor.js').then((module) => {
+          if (module.default && module.default.addParticleListItem) {
+            module.default.addParticleListItem(data);
+          }
+        });
+      }
+      break;
+    }
+    case "TEST_PARTICLE_EVENT": {
+
+      const { testType, particle, position, npcId } = data;
+
+      if (testType === "spawn_at_position" && position) {
+        // Spawn particle at player's position
+        if ((window as any).currentPlayer) {
+          (window as any).currentPlayer.particles = (window as any).currentPlayer.particles || [];
+          (window as any).currentPlayer.particles.push(particle);
+        }
+      } else if (testType === "attach_to_npc" && npcId) {
+        // Attach particle to NPC
+        if ((window as any).npcs && (window as any).npcs[npcId]) {
+          (window as any).npcs[npcId].particles = (window as any).npcs[npcId].particles || [];
+          (window as any).npcs[npcId].particles.push(particle);
+        }
+      } else if (testType === "simulate_weather") {
+        // Weather-affected particles test
+        if ((window as any).currentPlayer) {
+          (window as any).currentPlayer.particles = (window as any).currentPlayer.particles || [];
+          (window as any).currentPlayer.particles.push(particle);
+        }
+      }
+      break;
+    }
+    case "PARTICLE_UPDATED": {
+      // Update particle definitions in all NPCs that use this particle
+      const updatedParticle = data as any;
+      if (!updatedParticle.name) break;
+
+      // Get NPCs from cache instead of window object
+      const npcs = cache.npcs || [];
+
+      // Iterate through all NPCs and update matching particles
+      for (const npc of npcs) {
+        if (npc.particles && Array.isArray(npc.particles)) {
+          // Find and update particles with matching name
+          for (let i = 0; i < npc.particles.length; i++) {
+            if (npc.particles[i].name === updatedParticle.name) {
+              // Replace particle with updated definition
+              // Reset runtime properties (currentLife, initialVelocity) to null
+              // so particles restart fresh with the new definition
+              npc.particles[i] = {
+                ...updatedParticle,
+                currentLife: null,
+                initialVelocity: null
+              };
+
+              // Clear NPC's internal particle tracking so it emits fresh particles
+              if (npc.particleArrays && npc.particleArrays[updatedParticle.name]) {
+                npc.particleArrays[updatedParticle.name] = [];
+              }
+              if (npc.lastEmitTime && npc.lastEmitTime[updatedParticle.name] !== undefined) {
+                delete npc.lastEmitTime[updatedParticle.name];
+              }
+            }
+          }
+        }
+      }
       break;
     }
     case "RELOAD_CHUNKS": {
