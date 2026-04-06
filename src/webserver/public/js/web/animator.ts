@@ -1620,7 +1620,7 @@ class AnimatorTool {
       `;
 
       if (this.selectedTimelineFrame === index) {
-        frameEl.style.borderColor = '#8b5cf6';
+        frameEl.style.borderColor = '#22c55e';
       }
 
       const frameNumber = document.createElement('span');
@@ -2647,7 +2647,7 @@ class AnimatorTool {
 
     this.drawGrid(centerX, centerY);
 
-    this.gridCtx.strokeStyle = '#8b5cf6';
+    this.gridCtx.strokeStyle = '#22c55e';
     this.gridCtx.lineWidth = 2;
     this.gridCtx.setLineDash([]);
 
@@ -2694,7 +2694,7 @@ class AnimatorTool {
         this.gridCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.gridCtx.fillRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
 
-        this.gridCtx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+        this.gridCtx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
         this.gridCtx.lineWidth = 1;
         this.gridCtx.strokeRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
 
@@ -2763,7 +2763,7 @@ class AnimatorTool {
 
     this.drawGrid(centerX, centerY);
 
-    this.gridCtx.strokeStyle = '#8b5cf6';
+    this.gridCtx.strokeStyle = '#22c55e';
     this.gridCtx.lineWidth = 2;
     this.gridCtx.setLineDash([]);
 
@@ -2811,7 +2811,7 @@ class AnimatorTool {
           this.gridCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
           this.gridCtx.fillRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
 
-          this.gridCtx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+          this.gridCtx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
           this.gridCtx.lineWidth = 1;
           this.gridCtx.strokeRect(textX - textMetrics.width / 2 - 3, textY - 2, textMetrics.width + 6, 16);
 
@@ -2936,7 +2936,7 @@ class AnimatorTool {
       width: ${labelWidth}px;
       height: ${labelHeight}px;
       background: rgba(0, 0, 0, 0.9);
-      border: 1px solid #8b5cf6;
+      border: 1px solid #22c55e;
       color: #fff;
       font-size: 11px;
       font-family: monospace;

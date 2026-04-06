@@ -5,17 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/ico" href="./img/icons/favicon.ico">
     <title>Frostfire Forge - Animation Metadata Tool</title>
+    <link rel="stylesheet" href="./css/frontend.css">
     <link rel="stylesheet" href="./css/animator.css">
     <script defer src="./js/web/animator.js"></script>
 </head>
 <body>
     <div class="home-button" onclick="location.href='/'"></div>
 
+    <div class="header">
+        <h1>Animation Editor</h1>
+        <p>Create and edit sprite animations with frame-by-frame timeline control</p>
+    </div>
+
     <div class="container">
-        <div class="header">
-            <h1>Animation Editor</h1>
-            <p>Create and edit sprite animations with frame-by-frame timeline control</p>
-        </div>
 
         <div id="animator">
             <!-- Top Actions Bar -->
@@ -26,7 +28,7 @@
                     <input type="file" id="import-json-input" accept=".json" style="display: none;">
                 </div>
                 <div class="toolbar-section">
-                    <label style="display: flex; align-items: center; gap: 8px; color: #c4b5fd; font-size: 0.9em;">
+                    <label style="display: flex; align-items: center; gap: 8px; color: #22c55e; font-size: 0.9em;">
                         <input type="checkbox" id="autosave-checkbox" autocomplete="off">
                         Autosave
                     </label>
@@ -34,9 +36,9 @@
                 </div>
             </div>
 
-            <!-- Main Content Area -->
+            <!-- Main Content Area - 3 Column Layout -->
             <div id="animator-content">
-                <!-- Left Section: Settings and Preview -->
+                <!-- Left Column: Settings and Preview -->
                 <div id="left-section">
                     <!-- Grid Settings and Preview -->
                     <div class="panel-section">

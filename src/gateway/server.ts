@@ -404,6 +404,32 @@ const serverConfig: any = {
       });
     }
 
+    // Static file serving for CSS, JS, and other assets
+    if (url.pathname.startsWith("/css/") || url.pathname.startsWith("/js/") || url.pathname.startsWith("/images/")) {
+      try {
+        const filePath = new URL(`../webserver/public${url.pathname}`, import.meta.url);
+        const file = await Bun.file(filePath).bytes();
+
+        let contentType = "application/octet-stream";
+        if (url.pathname.endsWith(".css")) contentType = "text/css";
+        else if (url.pathname.endsWith(".js")) contentType = "application/javascript";
+        else if (url.pathname.endsWith(".png")) contentType = "image/png";
+        else if (url.pathname.endsWith(".jpg") || url.pathname.endsWith(".jpeg")) contentType = "image/jpeg";
+        else if (url.pathname.endsWith(".gif")) contentType = "image/gif";
+        else if (url.pathname.endsWith(".svg")) contentType = "image/svg+xml";
+        else if (url.pathname.endsWith(".woff")) contentType = "font/woff";
+        else if (url.pathname.endsWith(".woff2")) contentType = "font/woff2";
+        else if (url.pathname.endsWith(".ttf")) contentType = "font/ttf";
+
+        return new Response(file, {
+          status: 200,
+          headers: { "Content-Type": contentType }
+        });
+      } catch (error) {
+        return new Response("Not found", { status: 404 });
+      }
+    }
+
     if (url.pathname === "/status" && req.method === "GET") {
       const servers = Array.from(gameServers.values()).map(s => {
         const isHealthy = (Date.now() - s.lastHeartbeat) < config.serverTimeout;

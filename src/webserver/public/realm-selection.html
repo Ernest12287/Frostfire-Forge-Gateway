@@ -1,31 +1,63 @@
+<!DOCTYPE html>
 <html lang="en">
     <head>
         <link rel="icon" type="image/ico" href="img/icons/favicon.ico">
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="theme-color" content="#000000">
-        <title>Select Realm</title>
-        <script src="js/web/notification.js"></script>
-        <link rel="stylesheet" href="css/style.css">
+        <title>Frostfire Forge - Realm Selection</title>
+        <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="css/frontend.css">
         <link rel="stylesheet" href="css/realm-selection.css">
+        <script src="js/web/notification.js"></script>
     </head>
-    <body>
-        <div id="container">
-            <div id="logo"></div>
-            <div id="realm-container">
-                <div id="realm-title">Select a Realm</div>
-                <div id="realm-list">
-                    <div id="loading-message">Loading available realms...</div>
-                </div>
-                <div id="realm-actions">
-                    <button type="button" id="refresh-button">Refresh</button>
-                    <button type="button" id="continue-button" disabled>Continue</button>
+    <body class="realm-selection-page">
+        <!-- Header -->
+        <header class="realm-header">
+            <div class="realm-header-content">
+                <button class="back-button" onclick="location.href='/'">
+                    <span>←</span>
+                </button>
+                <div class="header-title-section">
+                    <h1 class="realm-page-title">Select a Realm</h1>
+                    <p class="realm-page-subtitle">Choose a server and begin your journey</p>
                 </div>
             </div>
-        </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="realm-main-content">
+            <div class="realm-grid-container">
+                <!-- Left Panel - Server List -->
+                <div class="realm-list-panel">
+                        <div id="error-message" class="error-message"></div>
+
+                    <div id="realm-list" class="realm-cards-container">
+                        <div id="loading-message" class="loading-state">Loading available realms...</div>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Server Details -->
+                <div class="realm-details-wrapper">
+                    <div class="realm-details-panel">
+                        <div id="details-content" class="details-content">
+                            <div class="no-selection">
+                                <div class="no-selection-icon">⚔️</div>
+                                <h3>Select a Realm</h3>
+                                <p>Pick a server to view its details</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" id="continue-button" class="realm-continue-button" disabled>
+                        Enter Realm
+                    </button>
+                </div>
+            </div>
+        </main>
 
         <script src="js/web/realm-selection.js"></script>
     </body>

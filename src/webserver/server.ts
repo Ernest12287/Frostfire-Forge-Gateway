@@ -19,7 +19,6 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import animator_html from "./public/animator.html";
-import connectiontest_html from "./public/connection-test.html";
 import login_html from "./public/index.html";
 import register_html from "./public/register.html";
 import game_html from "./public/game.html";
@@ -45,7 +44,6 @@ const _ca = process.env.WEBSRV_CA_PATH || path.join(import.meta.dir, "../certs/w
 const _https = process.env.WEBSRV_USESSL === "true" && fs.existsSync(_cert) && fs.existsSync(_key);
 
 const routes = {
-  "/connection-test": connectiontest_html,
   "/": login_html,
   "/registration": register_html,
   "/game": game_html,
@@ -149,7 +147,6 @@ Bun.serve({
     reusePort: false,
     routes: {
       "/swaggerui": routes["/swaggerui"],
-      "/connection-test": routes["/connection-test"],
       "/": routes["/"],
       "/registration": routes["/registration"],
       "/register": routes["/register"],

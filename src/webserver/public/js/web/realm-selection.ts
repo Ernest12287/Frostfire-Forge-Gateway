@@ -87,11 +87,10 @@ function renderServers(): void {
         return;
     }
 
-    realmList.innerHTML = servers.map(server => {
+    realmList.innerHTML = servers.map((server, index) => {
         const status = server.status;
 
-        const subdomain = server.publicHost.split('.')[0];
-        const realmName = subdomain.charAt(0).toUpperCase() + subdomain.slice(1);
+        const realmName = server.id;
 
         let statusClass = 'healthy';
         let statusText = 'Online';
@@ -107,24 +106,25 @@ function renderServers(): void {
         const clientPing = serverPings.get(server.id);
         const latencyDisplay = clientPing !== undefined
             ? `${clientPing}ms`
-            : (status === 'offline' ? 'offline' : '<span style="color: #6366f1;">measuring...</span>');
+            : (status === 'offline' ? 'offline' : '<span style="color: #22c55e;">measuring...</span>');
 
         return `
             <div class="realm-card ${status === 'offline' ? 'disabled' : ''}" data-server-id="${server.id}" ${status === 'offline' ? 'style="pointer-events: none; opacity: 0.5;"' : ''}>
-                <div class="realm-header">
+                <div class="realm-card-info">
                     <div class="realm-name">${realmName}</div>
-                    <div class="realm-right">
-                        <div class="realm-status ${statusClass}">${statusText}</div>
-                        <div class="realm-latency">${latencyDisplay}</div>
+                    <div class="realm-card-stats">
+                        <div class="realm-metric">
+                            <span class="realm-metric-label">Players:</span>
+                            <span class="realm-metric-value">${server.activeConnections}/${server.maxConnections}</span>
+                        </div>
                     </div>
                 </div>
-                <div class="realm-metrics">
-                    <div class="realm-metric">
-                        <span class="realm-metric-label">Players:</span>
-                        <span class="realm-metric-value">${server.activeConnections}/${server.maxConnections}</span>
-                    </div>
+                <div class="realm-right">
+                    <div class="realm-status ${statusClass}">${statusText}</div>
+                    <div class="realm-latency">${latencyDisplay}</div>
                 </div>
             </div>
+            <div class="realm-divider"></div>
         `;
     }).join('');
 
@@ -135,6 +135,15 @@ function renderServers(): void {
             selectedServerId = (card as HTMLElement).dataset.serverId || null;
             const continueBtn = document.getElementById('continue-button') as HTMLButtonElement;
             if (continueBtn) continueBtn.disabled = false;
+
+            // Hide no-selection message and show realm details
+            const detailsContent = document.getElementById('details-content');
+            if (detailsContent) {
+                const noSelection = detailsContent.querySelector('.no-selection');
+                if (noSelection) {
+                    noSelection.remove();
+                }
+            }
         });
     });
 }
