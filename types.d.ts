@@ -1,6 +1,7 @@
 type Nullable<T> = T | null;
 interface GameServer {
   id: string;
+  description?: string;
   host: string;
   publicHost: string;
   port: number;

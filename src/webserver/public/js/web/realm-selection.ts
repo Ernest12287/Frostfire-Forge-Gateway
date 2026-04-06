@@ -139,9 +139,14 @@ function renderServers(): void {
             // Hide no-selection message and show realm details
             const detailsContent = document.getElementById('details-content');
             if (detailsContent) {
-                const noSelection = detailsContent.querySelector('.no-selection');
-                if (noSelection) {
-                    noSelection.remove();
+                const message = document.getElementsByClassName('no-selection')[0] as HTMLElement;
+                const server = servers.find(s => s.id === selectedServerId);
+                if (message && server) {
+                    message.innerHTML = `
+                        <div class="no-selection-icon">⚔️</div>
+                        <h3>${server.id}</h3>
+                        <p>${server.description || 'No description available.'}</p>
+                    `;
                 }
             }
         });

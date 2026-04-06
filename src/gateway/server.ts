@@ -151,7 +151,7 @@ const serverConfig: any = {
     if (url.pathname === "/register" && req.method === "POST") {
       try {
         const body = await req.json();
-        const { id, host, publicHost, port, wsPort, useSSL, maxConnections, authKey } = body;
+        const { id, host, publicHost, port, wsPort, useSSL, maxConnections, authKey, description } = body;
 
         if (authKey !== config.authKey) {
           console.warn(`[Gateway] Registration attempt with invalid auth key from ${host}`);
@@ -173,6 +173,7 @@ const serverConfig: any = {
 
         const server: GameServer = {
           id,
+          description,
           host,
           publicHost: publicHost || host,
           port,
@@ -349,6 +350,7 @@ const serverConfig: any = {
 
       const servers = Array.from(gameServers.values()).map(s => ({
         id: s.id,
+        description: s.description || '',
         host: s.host,
         publicHost: s.publicHost,
         port: s.port,
@@ -437,6 +439,7 @@ const serverConfig: any = {
 
         return {
           id: s.id,
+          description: s.description || '',
           publicHost: s.publicHost,
           port: s.port,
           wsPort: s.wsPort,
@@ -593,6 +596,7 @@ if (useSSL) {
 
           return {
             id: s.id,
+            description: s.description || '',
             publicHost: s.publicHost,
             port: s.port,
             wsPort: s.wsPort,
