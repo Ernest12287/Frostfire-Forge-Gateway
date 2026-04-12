@@ -107,7 +107,13 @@ export default async function loadMap(metadata: any): Promise<boolean> {
 
     progressBar.style.width = "30%";
 
-    const CHUNK_SIZE = tilewidth;
+    // Dynamic chunk sizing: maintain consistent chunk pixel size (~1024px²) regardless of tile size
+    const CHUNK_SIZE_CONFIG: { [key: number]: number } = {
+      16: 64,   // 16px tiles → 64 tile chunks = 1024×1024px
+      32: 32,   // 32px tiles → 32 tile chunks = 1024×1024px
+      64: 16,   // 64px tiles → 16 tile chunks = 1024×1024px
+    };
+    const CHUNK_SIZE = CHUNK_SIZE_CONFIG[tilewidth] || 32; // Default to 32 if tile size not in config
     const chunksX = Math.ceil(mapWidth / CHUNK_SIZE);
     const chunksY = Math.ceil(mapHeight / CHUNK_SIZE);
 
@@ -491,6 +497,7 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
   const sortedLayers = [...chunkData.layers].sort((a, b) => a.zIndex - b.zIndex);
 
   const PLAYER_Z_INDEX = 3;
+  const TILES_PER_FRAME = 10; // Render only 10 tiles per frame to avoid blocking
 
   for (let layerIdx = 0; layerIdx < sortedLayers.length; layerIdx++) {
     const layer = sortedLayers[layerIdx];
@@ -502,7 +509,6 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
 
     const ctx = layer.zIndex < PLAYER_Z_INDEX ? lowerCtx : upperCtx;
 
-    const BATCH_SIZE = 100;
     let tileCount = 0;
 
     for (let y = 0; y < chunkData.height; y++) {
@@ -538,7 +544,8 @@ async function renderChunkToCanvas(chunkData: ChunkData): Promise<{lowerCanvas: 
 
         tileCount++;
 
-        if (tileCount % BATCH_SIZE === 0) {
+        // Yield to browser every TILES_PER_FRAME tiles to keep frame rate smooth
+        if (tileCount % TILES_PER_FRAME === 0) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       }

@@ -9,6 +9,13 @@ import {
 
 const spriteSheetCache: SpriteSheetCache = {};
 
+/**
+ * Animation Frame Sequence Cache
+ * Caches pre-built animation frame sequences to avoid rebuilding them on every animation change
+ * Key format: `${spriteName}:${animationName}` (e.g., "body:walk_down")
+ */
+const animationFrameCache: Map<string, AnimationFrame[]> = new Map();
+
 // Fetch sprite sheet template from asset server
 async function fetchSpriteSheetTemplate(templateUrl: string): Promise<any> {
   try {
@@ -347,6 +354,29 @@ export function updateLayeredAnimation(
   });
 }
 
+/**
+ * Get or build animation frames with caching
+ * Avoids rebuilding frame sequences on every animation change
+ */
+async function getOrBuildAnimationFrames(
+  spriteName: string,
+  animationName: string,
+  spriteSheet: SpriteSheetTemplate,
+  extractedFrames: Map<number, HTMLImageElement>
+): Promise<AnimationFrame[]> {
+  const cacheKey = `${spriteName}:${animationName}`;
+
+  // Return cached frames if available
+  if (animationFrameCache.has(cacheKey)) {
+    return animationFrameCache.get(cacheKey)!;
+  }
+
+  // Build and cache the frames
+  const frames = await buildAnimationFrames(spriteSheet, animationName, extractedFrames);
+  animationFrameCache.set(cacheKey, frames);
+  return frames;
+}
+
 export async function changeLayeredAnimation(
   layeredAnim: LayeredAnimation,
   newAnimationName: string
@@ -405,9 +435,11 @@ export async function changeLayeredAnimation(
           return;
         }
 
-        layer.frames = await buildAnimationFrames(
-          cached.template,
+        // Use cached animation frames to avoid rebuilding on every animation change
+        layer.frames = await getOrBuildAnimationFrames(
+          (layer.spriteSheet as any).name || layer.type,
           actualAnimationName,
+          cached.template,
           new Map<number, HTMLImageElement>(Object.entries(cached.extractedFrames).map(([k, v]) => [Number(k), v]))
         );
         layer.currentFrame = 0;
@@ -448,5 +480,24 @@ export function getVisibleLayersSorted(layeredAnim: LayeredAnimation): Animation
     }
     return layer;
   }).sort((a, b) => a.zIndex - b.zIndex);
+}
+
+/**
+ * Clear the animation frame cache
+ * Useful for memory management or testing
+ */
+export function clearAnimationFrameCache(): void {
+  animationFrameCache.clear();
+}
+
+/**
+ * Get animation frame cache statistics
+ * Returns the number of cached animation sequences
+ */
+export function getAnimationFrameCacheStats(): { size: number; entries: string[] } {
+  return {
+    size: animationFrameCache.size,
+    entries: Array.from(animationFrameCache.keys())
+  };
 }
 

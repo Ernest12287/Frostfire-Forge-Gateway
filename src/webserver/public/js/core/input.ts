@@ -197,9 +197,10 @@ const blacklistedKeys = new Set([
 ]);
 
 function cast(hotbar_index: number) {
-    if (isKeyOnCooldown(`Digit${hotbar_index + 1}`)) return;
+    const keyName = `Digit${hotbar_index + 1}`;
+    if (isKeyOnCooldown(keyName)) return;
     selectHotbarSlot(hotbar_index);
-    putKeyOnCooldown(`Digit${hotbar_index + 1}`);
+    putKeyOnCooldown(keyName);
 
     // Check for targeted player
     const targetPlayer = Array.from(cache?.players).find(p => p?.targeted) || null;
@@ -218,6 +219,18 @@ function cast(hotbar_index: number) {
     const slot = hotbarSlots[hotbar_index];
     const spellName = slot?.dataset?.spellName;
     if (!spellName) return;
+
+    // Optimistically set casting state on client before server response
+    const currentPlayer = Array.from(cache.players).find(p => p.id === cachedPlayerId);
+    if (currentPlayer) {
+      const formattedSpellName = spellName.split('_').map(word =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+      currentPlayer.castingSpell = formattedSpellName;
+      currentPlayer.castingStartTime = performance.now();
+      currentPlayer.castingDuration = 2000; // Default, will be updated by server
+      currentPlayer.castingInterrupted = false;
+    }
 
     sendRequest({
       type: "HOTBAR",
@@ -261,6 +274,31 @@ function clearKeyCooldown(key: string) {
 function handleEscapeKey() {
   stopMovement();
   chatInput.blur();
+
+  // Check if currently casting a spell and cancel it instead of opening pause menu
+  const currentPlayer = Array.from(cache.players).find(p => p.id === cachedPlayerId);
+
+  if (currentPlayer && currentPlayer.castingSpell) {
+    // Cancel the spell cast
+    currentPlayer.castingSpell = null;
+    currentPlayer.castingInterrupted = true;
+    currentPlayer.castingInterruptedProgress = currentPlayer.castingDuration
+      ? (performance.now() - currentPlayer.castingStartTime) / currentPlayer.castingDuration
+      : 0;
+
+    // Clear all spell key cooldowns so player can immediately recast
+    for (let i = 1; i <= 10; i++) {
+      clearKeyCooldown(`Digit${i}`);
+    }
+
+    // Notify server to cancel the spell
+    sendRequest({
+      type: "CANCEL_SPELL",
+      data: null
+    });
+
+    return; // Don't open pause menu
+  }
 
   const isPauseMenuVisible = pauseMenu.style.display === "block";
   pauseMenu.style.display = isPauseMenuVisible ? "none" : "block";

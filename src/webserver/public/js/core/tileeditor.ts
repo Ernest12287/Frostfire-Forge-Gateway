@@ -408,6 +408,9 @@ class TileEditor {
   private initialize() {
     if (!window.mapData) return;
 
+    // Convert graveyards and warps from arrays to objects for editor convenience
+    this.convertMapObjectsToEditorFormat();
+
     this.loadLayers();
     this.loadObjectLayers();
     this.loadTilesets();
@@ -415,6 +418,38 @@ class TileEditor {
     this.updatePasteButtonState();
 
     this.toggleOpacityBtn.classList.remove('active');
+  }
+
+  private convertMapObjectsToEditorFormat() {
+    if (!window.mapData) return;
+
+    // Convert graveyards array to object with name keys
+    if (Array.isArray(window.mapData.graveyards)) {
+      const graveyardsObj: any = {};
+      window.mapData.graveyards.forEach((g: any) => {
+        graveyardsObj[g.name] = {
+          position: g.position,
+          layer: g.layer
+        };
+      });
+      window.mapData.graveyards = graveyardsObj;
+    }
+
+    // Convert warps array to object with name keys
+    if (Array.isArray(window.mapData.warps)) {
+      const warpsObj: any = {};
+      window.mapData.warps.forEach((w: any) => {
+        warpsObj[w.name] = {
+          map: w.map,
+          x: w.x,
+          y: w.y,
+          position: w.position,
+          size: w.size,
+          layer: w.layer
+        };
+      });
+      window.mapData.warps = warpsObj;
+    }
   }
 
   private loadLayers() {
@@ -1364,9 +1399,7 @@ class TileEditor {
           }
           warpData.position.x = newX;
           warpData.position.y = newY;
-          // Keep x/y in sync for backward compatibility
-          warpData.x = newX;
-          warpData.y = newY;
+          // x and y are destination coordinates from properties - do NOT update them when moving the trigger zone
         }
       }
       return;
@@ -1768,14 +1801,13 @@ class TileEditor {
           const snappedX = Math.round(currentX);
           const snappedY = Math.round(currentY);
 
-          // Update position
+          // Update position (trigger zone only, not destination coordinates)
           if (!warpData.position) {
             warpData.position = {};
           }
           warpData.position.x = snappedX;
           warpData.position.y = snappedY;
-          warpData.x = snappedX;
-          warpData.y = snappedY;
+          // x and y are destination coordinates from properties - do NOT update them when moving the trigger zone
 
           // Record mutation only if position changed
           const warpWidth = warpData.size?.width || 32;
@@ -3037,21 +3069,30 @@ class TileEditor {
     });
 
     // Count objects being saved
-    let objectCount = 0;
-    if (window.mapData?.graveyards) {
-      objectCount += Object.keys(window.mapData.graveyards).length;
-    }
-    if (window.mapData?.warps) {
-      objectCount += Object.keys(window.mapData.warps).length;
-    }
+    // Convert graveyards and warps from objects to arrays for saving
+    const graveyardsArray = window.mapData?.graveyards
+      ? Object.entries(window.mapData.graveyards).map(([name, data]: [string, any]) => ({
+          name,
+          ...data
+        }))
+      : [];
+
+    const warpsArray = window.mapData?.warps
+      ? Object.entries(window.mapData.warps).map(([name, data]: [string, any]) => ({
+          name,
+          ...data
+        }))
+      : [];
+
+    let objectCount = graveyardsArray.length + warpsArray.length;
 
     const savePayload: any = {
       type: 'SAVE_MAP',
       data: {
         mapName: window.mapData.name,
         chunks: chunks,
-        graveyards: window.mapData.graveyards || {},
-        warps: window.mapData.warps || {}
+        graveyards: graveyardsArray,
+        warps: warpsArray
       }
     };
 

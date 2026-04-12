@@ -1215,6 +1215,9 @@ socket.onmessage = async (event) => {
 
               if (data.mountSprite && player.layeredAnimation.layers.mount) {
                 player.layeredAnimation.layers.mount.spriteSheet = data.mountSprite;
+              } else if (!data.mountSprite && player.layeredAnimation.layers.mount) {
+                // Player dismounted - remove the mount layer
+                player.layeredAnimation.layers.mount = null;
               }
               if (data.bodySprite && player.layeredAnimation.layers.body) {
                 player.layeredAnimation.layers.body.spriteSheet = data.bodySprite;
@@ -2731,9 +2734,14 @@ socket.onmessage = async (event) => {
         }
 
         if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === String(target)) {
-          levelLabel!.innerText = `Level: ${stats.level}`;
+          // Use existing player stats for fields not included in damage packet
+          const displayLevel = stats.level !== undefined ? stats.level : t.stats.level;
+          const displayStamina = stats.stamina !== undefined ? stats.stamina : t.stats.stamina;
+          const displayMaxStamina = stats.total_max_stamina !== undefined ? stats.total_max_stamina : t.stats.total_max_stamina;
+
+          levelLabel!.innerText = `Level: ${displayLevel}`;
           healthLabel!.innerText = `Health: ${stats.health} / ${stats.total_max_health}`;
-          manaLabel!.innerText = `Mana: ${stats.stamina} / ${stats.total_max_stamina}`;
+          manaLabel!.innerText = `Mana: ${displayStamina} / ${displayMaxStamina}`;
           damageLabel!.innerText = `Damage: ${stats.stat_damage || 0}`;
           armorLabel!.innerText = `Armor: ${stats.stat_armor || 0}%`;
           critChanceLabel!.innerText = `Critical Chance: ${stats.stat_critical_chance || 0}%`;

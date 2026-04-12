@@ -12,18 +12,14 @@ function Notify(type: string, message: string, time?: number): void {
 	notification.innerHTML = `<p>${message}</p>`;
 	document.body.appendChild(notification);
 
-	const notifications = document.getElementsByClassName("notification");
-	for (let i = 0; i < notifications.length; i++) {
-		(notifications[i] as HTMLElement).style.marginBottom = `${80 * i}px`;
-	}
+	// Force a reflow to trigger animation
+	void notification.offsetHeight;
 
 	setTimeout(() => {
-
-		const notifications = document.getElementsByClassName("notification");
-		for (let i = 0; i < notifications.length; i++) {
-			(notifications[i] as HTMLElement).style.marginBottom = `${80 * (i - 1)}px`;
-		}
-		notification.remove();
+		notification.style.animation = `slideOutRight 0.3s ease-out forwards`;
+		setTimeout(() => {
+			notification.remove();
+		}, 300);
 	}, time || 5000);
 }
 
