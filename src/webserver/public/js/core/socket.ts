@@ -368,12 +368,9 @@ function initializeConnection() {
 
   reconnectAttempts = 0;
 
-  if (!cache || !cache.players) {
-    console.error("Cache not initialized properly");
-    return;
+  if (cache?.players) {
+    cache.players.clear();
   }
-
-  cache.players.clear();
 
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
   sessionActive = false;
