@@ -1936,7 +1936,9 @@ socket.onmessage = async (event) => {
         cachedPlayerId = connectionId;
         sessionActive = true;
 
-        cache.players.clear();
+        if (cache?.players) {
+          cache.players.clear();
+        }
 
   sendRequest({ type: "GET_ONLINE_PLAYERS", data: null });
 
