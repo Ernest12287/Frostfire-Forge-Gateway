@@ -1,20 +1,16 @@
+# Production Dockerfile for Frostfire Forge Asset Server
 FROM oven/bun:canary AS base
 WORKDIR /app
 
+# Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
-FROM base AS build
-COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile
-COPY . .
-
+# Production stage
 FROM base AS production
-WORKDIR /app
-
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app .
+COPY . .
 
 ARG VERSION=unknown
 ARG BUILD_DATE=unknown
